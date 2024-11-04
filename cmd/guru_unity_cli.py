@@ -4,12 +4,13 @@ import argparse
 import os
 import shutil
 import json
+import datetime
 from os.path import expanduser
 
 # CONSTS
 VERSION = '0.1.0'
 SDK_HOME = '.guru/unity/guru_sdk'
-SDK_LIB_REPO = 'https://github.com/castbox/unity-gurusdk-library.git'
+SDK_LIB_REPO = 'git@github.com:castbox/unity-gurusdk-library.git'
 SDK_DEV_REPO = 'git@github.com:castbox/unity-gurusdk-dev.git'
 
 
@@ -58,15 +59,21 @@ def publish_guru_sdk(version: str, branch: str):
     source = os.path.join(pwd, 'source')
     output = os.path.join(pwd, 'output')
     pkg_path = os.path.join(source, 'packages')
+    to_path = os.path.join(output, version)
 
-
-
+    # clear source from last pull
     if os.path.exists(source):
         delete_dir(source)
 
+    # clear temp lib dir
     if os.path.exists(output):
         delete_dir(output)
 
+    # clear same version and will make a new version folder
+    if os.path.exists(to_path):
+        delete_dir(to_path)
+
+    # default branch
     if len(branch) == 0:
         branch = 'main'
 
@@ -82,17 +89,20 @@ def publish_guru_sdk(version: str, branch: str):
     # clone all remote upms
     collect_upm_pkgs(source)
 
-    to_path = os.path.join(output, version)
-
-    if os.path.exists(to_path):
-        delete_dir(to_path)
-
     # make version dir
     shutil.copytree(pkg_path, to_path)
 
+    push_msg = f'Make version {version} on  {datetime.date.today().strftime("%Y/%m/%d %H:%M:%S")}  by push'
 
-    # todo 解析和生成对应的配置文件， 并且下载所有对应的第三方 upm 至 to_path
+    # commit to the publishing repo
+    run_cmd(f'git add .', output)
+    run_cmd(f'git commit -m \"{push_msg}\"', output)
+    run_cmd(f'git push', output)
 
+    print('===== Publish is done! ======')
+
+    delete_dir(source)
+    delete_dir(output)
 
     pass
 
@@ -154,16 +164,17 @@ def collect_upm_pkgs(root_path: str):
 
                 pass
 
-        run_cmd(f"cp {config_file} {os.path.join(upm_path,'sdk_config.json')}")
+        run_cmd(f"cp {config_file} {os.path.join(upm_path,'sdk-config.json')}")
 
     pass
 
 
+# init all the args from input
 def init_args():
     parser = argparse.ArgumentParser(description='gurusdk cli tool')
     parser.add_argument('action', type=str, help='sync,init,publish')
-    parser.add_argument('--platform', type=str, help='flutter or unity')
-
+    parser.add_argument('--version', type=str, help='version for publish')
+    parser.add_argument('--branch', type=str, help='branch for dev project')
     return parser.parse_args()
 
 
@@ -179,6 +190,14 @@ if __name__ == '__main__':
         sync_guru_sdk()
     elif args.action == 'publish':
         # publish sdk with special version
-        publish_guru_sdk('1.1.7', 'hotfix/V1.1.7')
+        ver = args['version']
+        bra = args['branch']
+
+        if len(ver) == 0:
+            print('wrong version format')
+        elif len(bra) == 0:
+            print('wrong branch name')
+        else:
+            publish_guru_sdk(ver, bra)
 
     pass
