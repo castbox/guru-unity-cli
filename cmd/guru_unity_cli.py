@@ -71,7 +71,7 @@ def get_sdk_home():
 
 
 def is_windows_platform():
-    return os.name is 'nt'
+    return os.name == 'nt'
 
 
 # ---------------------- SYNC ----------------------
@@ -161,13 +161,47 @@ def save_unity_manifest_json(path: str, data: object):
 # ---------------------- PUBLISH ----------------------
 # publish the new version
 def publish_guru_sdk(version: str, branch: str):
+
+    source, output, to_path = download_all_repos_and_gen_path(version, branch)
+
+    pkg_path = os.path.join(source, 'packages')
+
+    # clone all remote upms
+    collect_all_upm_packages(source)
+
+    # make version dir
+    shutil.copytree(pkg_path, to_path)
+
+    push_msg = f'Make version {version} on  {datetime.date.today().strftime("%Y/%m/%d %H:%M:%S")}  by push'
+
+    # commit to the publishing repo
+    run_cmd(f'git add .', output)
+    run_cmd(f'git commit -m \"{push_msg}\"', output)
+    run_cmd(f'git push', output)
+
+    print('===== Publish is done! ======')
+
+    delete_dir(source)
+    delete_dir(output)
+
+    pass
+
+
+# download the source proj 'unity-gurusdk-dev'
+# and the output proj 'unity-gurusdk-library'
+def download_all_repos_and_gen_path(version: str, branch: str):
     pwd = os.getcwd()
     print('cmd path:', pwd)
 
     source = os.path.join(pwd, 'source')
     output = os.path.join(pwd, 'output')
-    pkg_path = os.path.join(source, 'packages')
     to_path = os.path.join(output, version)
+
+    if is_windows_platform():
+        source = source.replace('/', '\\')
+        output = source.replace('/', '\\')
+        to_path = source.replace('/', '\\')
+
 
     # clear source from last pull
     if os.path.exists(source):
@@ -194,23 +228,7 @@ def publish_guru_sdk(version: str, branch: str):
     os.mkdir(output)
     run_cmd(f'git clone {SDK_LIB_REPO} .', output)
 
-    # clone all remote upms
-    collect_all_upm_packages(source)
-
-    # make version dir
-    shutil.copytree(pkg_path, to_path)
-
-    push_msg = f'Make version {version} on  {datetime.date.today().strftime("%Y/%m/%d %H:%M:%S")}  by push'
-
-    # commit to the publishing repo
-    run_cmd(f'git add .', output)
-    run_cmd(f'git commit -m \"{push_msg}\"', output)
-    run_cmd(f'git push', output)
-
-    print('===== Publish is done! ======')
-
-    delete_dir(source)
-    delete_dir(output)
+    return source, output, to_path
 
     pass
 
@@ -279,10 +297,10 @@ def collect_all_upm_packages(root_path: str):
 # init all the args from input
 def init_args():
     parser = argparse.ArgumentParser(description='guru-sdk cli tool')
-    parser.add_argument('action', type=str, help='sync,init,publish')
+    parser.add_argument('action', type=str, help='sync,publish,debug_source')
     parser.add_argument('--version', type=str, help='version for publish')
     parser.add_argument('--branch', type=str, help='branch for dev project')
-    return parser.parse_args()
+    return parser.parse_args(args=[])
 
 
 # Entry of the cli.
@@ -292,19 +310,28 @@ if __name__ == '__main__':
     print('OS', os.name)
     print('Action:', args.action)
 
-    if args.action == 'sync':
+    action = args.action
+    version = args['version']
+    branch = args['branch']
+
+    if action == 'sync':
         # sync the latest version of guru_sdk
         sync_sdk()
-    elif args.action == 'publish':
+    elif action == 'publish':
         # publish sdk with special version
-        version = args['version']
-        branch = args['branch']
-
         if len(version) == 0:
             print('wrong version format')
         elif len(branch) == 0:
             print('wrong branch name')
         else:
             publish_guru_sdk(version, branch)
+
+    elif action == 'debug_source':
+        if len(version) == 0:
+            print('wrong version format')
+        elif len(branch) == 0:
+            print('wrong branch name')
+        else:
+            download_all_repos_and_gen_path(version, branch)
 
     pass
