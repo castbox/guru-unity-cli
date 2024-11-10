@@ -199,20 +199,23 @@ def download_all_repos_and_gen_path(version: str, branch: str):
 
     if is_windows_platform():
         source = source.replace('/', '\\')
-        output = source.replace('/', '\\')
-        to_path = source.replace('/', '\\')
+        output = output.replace('/', '\\')
+        to_path = to_path.replace('/', '\\')
 
 
     # clear source from last pull
     if os.path.exists(source):
+        print('clear source at', source)
         delete_dir(source)
 
     # clear temp lib dir
     if os.path.exists(output):
+        print('clear output at', output)
         delete_dir(output)
 
     # clear same version and will make a new version folder
     if os.path.exists(to_path):
+        print('clear to_path at', to_path)
         delete_dir(to_path)
 
     # default branch
@@ -220,12 +223,14 @@ def download_all_repos_and_gen_path(version: str, branch: str):
         branch = 'main'
 
     # clone dev
-    os.mkdir(source)
+    print('create source at', source)
+    os.makedirs(source)
     run_cmd(f'git clone -b {branch} {SDK_DEV_REPO} .', source)
     run_cmd(f'git submodule update --init --recursive', source)
 
     # clone lib
-    os.mkdir(output)
+    print('create output at', output)
+    os.makedirs(output)
     run_cmd(f'git clone {SDK_LIB_REPO} .', output)
 
     return source, output, to_path
