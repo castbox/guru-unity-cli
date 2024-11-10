@@ -64,7 +64,14 @@ def get_sdk_home():
     if len(__user_sdk_home) == 0:
         __user_sdk_home = os.path.join(get_user_home(), SDK_HOME_NAME)
 
+    if is_windows_platform():
+        __user_sdk_home = __user_sdk_home.replace('/', '\\')
+
     return __user_sdk_home
+
+
+def is_windows_platform():
+    return os.name is 'nt'
 
 
 # ---------------------- SYNC ----------------------
@@ -77,7 +84,7 @@ def sync_sdk():
         delete_dir(sdk_home)
         pass
 
-    os.mkdir(sdk_home)
+    os.makedirs(sdk_home)
     run_cmd(f'git clone --depth 1 {SDK_LIB_REPO} .', sdk_home)
     pass
 
@@ -282,7 +289,7 @@ def init_args():
 if __name__ == '__main__':
     print(f'========== Welcome to GuruSdk CLI [{VERSION}] ==========')
     args = init_args()
-
+    print('OS', os.name)
     print('Action:', args.action)
 
     if args.action == 'sync':
