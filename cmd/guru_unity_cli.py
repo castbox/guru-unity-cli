@@ -300,7 +300,7 @@ def init_args():
     parser.add_argument('action', type=str, help='sync,publish,debug_source')
     parser.add_argument('--version', type=str, help='version for publish')
     parser.add_argument('--branch', type=str, help='branch for dev project')
-    return parser.parse_args(args=[])
+    return parser.parse_args()
 
 
 # Entry of the cli.
@@ -311,8 +311,8 @@ if __name__ == '__main__':
     print('Action:', args.action)
 
     action = args.action
-    version = args['version']
-    branch = args['branch']
+    version = args.version
+    branch = args.branch
 
     if action == 'sync':
         # sync the latest version of guru_sdk
