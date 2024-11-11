@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3
 
 import argparse
 import os
@@ -10,7 +10,6 @@ from os.path import expanduser
 # CONSTS
 VERSION = '0.1.0'
 SDK_CONFIG_JSON = 'sdk-config.json'  # SDK 开发者定义的 upm 包的配置关系，包含所有包体的可选以及从属关系, [需要配置在 DEV 项目]
-GURU_PKGS = 'guru-pkgs'  # SDK 开发者定义的 upm 包列表，用于标记从 dev 项目中需要拾取的包有哪些, [需要配置在 DEV 项目]
 SDK_HOME_NAME = '.guru/unity/guru-sdk'  # 用户设备上缓存 SDK 各个版本的路径
 SDK_LIB_REPO = 'git@github.com:castbox/unity-gurusdk-library.git'  # 线上发布的 SDK 静态库的 repo
 SDK_DEV_REPO = 'git@github.com:castbox/unity-gurusdk-dev.git'  # SDK 开发者所使用的开发 Repo
@@ -19,7 +18,7 @@ UNITY_MANIFEST_JSON = 'manifest.json'  # unity 项目自身的 UPM 包清单文�
 UNITY_PACKAGES_LOCK_JSON = 'packages-lock.json'  # unity 项目自身的 UPM 包清单文件
 UNITY_PACKAGES_ROOT = 'Packages'  # unity 项目自身的 UPM 包清单文件
 UNITY_DEV_PROJECT = 'GuruSDKDev'  # unity 开发项目中 Unity 工程路径的二级目录
-
+VERSION_LIST = 'version_list.json'  # SDK 版本描述文件
 
 __user_sdk_home: str = ''
 
@@ -62,16 +61,45 @@ def get_user_home():
 def get_sdk_home():
     global __user_sdk_home
     if len(__user_sdk_home) == 0:
-        __user_sdk_home = os.path.join(get_user_home(), SDK_HOME_NAME)
-
-    if is_windows_platform():
-        __user_sdk_home = __user_sdk_home.replace('/', '\\')
+        __user_sdk_home = path_join(get_user_home(), SDK_HOME_NAME)
 
     return __user_sdk_home
 
 
 def is_windows_platform():
     return os.name == 'nt'
+
+
+def path_join(path1: str, path2: str):
+    p =  os.path.join(path1, path2)
+    return to_safe_path(p)
+
+
+def to_safe_path(path: str):
+    if is_windows_platform():
+        return path.replace('/', '\\')  # windows os
+    return path.replace('\\', '/')  # mac or liunx os
+
+
+# read content from a file
+def read_file(path: str):
+    if not os.path.exists(path):
+        print('file not found', path)
+        return ''
+
+    with open(path, 'r') as f:
+        txt = f.read()
+        f.close()
+        return txt
+
+
+# write sth into a file
+def write_file(path: str, content: str):
+    with open(path, 'w') as f:
+        f.write(content)
+        f.close()
+
+
 
 
 # ---------------------- SYNC ----------------------
@@ -93,11 +121,11 @@ def sync_sdk():
 def sync_and_install_sdk(unity_proj_path: str):
 
     sdk_home = get_sdk_home()
-    upm_root = os.path.join(unity_proj_path, f'{UNITY_PACKAGES_ROOT}/{UPM_ROOT_NAME}')
-    manifest_path = os.path.join(unity_proj_path, f'{UNITY_PACKAGES_ROOT}/{UNITY_MANIFEST_JSON}')
-    guru_pkgs = os.path.join(unity_proj_path, f'{UNITY_PACKAGES_ROOT}/{GURU_PKGS}')
+    upm_root = path_join(unity_proj_path, f'{UNITY_PACKAGES_ROOT}/{UPM_ROOT_NAME}')
+    manifest_path = path_join(unity_proj_path, f'{UNITY_PACKAGES_ROOT}/{UNITY_MANIFEST_JSON}')
+    sdk_config = path_join(unity_proj_path, f'{UNITY_PACKAGES_ROOT}/{SDK_CONFIG_JSON}')
 
-    if not os.path.exists(guru_pkgs):
+    if not os.path.exists(sdk_config):
         print("user has not choose any package yet, no packages will be install")
         return
         pass
@@ -113,14 +141,15 @@ def sync_and_install_sdk(unity_proj_path: str):
     if manifest_json is None:
         return
 
-    with open(guru_pkgs, 'r') as f:
-        lines = f.readlines()
-        for p in lines:
-            if '#' in p:
-                # comment line
-                continue
+    with open(sdk_config, 'r') as f:
+        cfg = json.loads(f.read())
 
-            in_path = os.path.join(sdk_home, p)
+        if cfg or cfg['packages'] is None:
+            print('json parse error with', sdk_config, 'plz fix the errors')
+            return
+
+        for p in cfg['packages']:
+            in_path = path_join(sdk_home, p)
             if not os.path.exists(in_path):
                 print(f'package [{p}] not found, skip install...')
                 continue
@@ -128,11 +157,11 @@ def sync_and_install_sdk(unity_proj_path: str):
             run_cmd(f'ln -s {in_path} {p}', upm_root)
             print('Add package at path: ', in_path)
 
+            # record deps
             manifest_json['dependencies'][p] = f'file:{UPM_ROOT_NAME}/{p}'
-
-            # save the manifest file
-            save_unity_manifest_json(manifest_path, manifest_json)
             pass
+        # save the manifest file
+        save_unity_manifest_json(manifest_path, manifest_json)
         pass
     pass
 
@@ -160,19 +189,24 @@ def save_unity_manifest_json(path: str, data: object):
 
 # ---------------------- PUBLISH ----------------------
 # publish the new version
-def publish_guru_sdk(version: str, branch: str):
-
-    source, output, to_path = download_all_repos_and_gen_path(version, branch)
-
-    pkg_path = os.path.join(source, 'packages')
+def _publish_sdk(source: str, output: str, clean_mode: int = 0):
 
     # clone all remote upms
-    collect_all_upm_packages(source)
+    _version, additions = collect_upm_dependencies_and_version(source)
+
+    # sub paths
+    to_path = path_join(output, _version)
+    pkg_path = path_join(source, 'packages')
 
     # make version dir
+    if os.path.exists(to_path):
+        delete_dir(to_path)
     shutil.copytree(pkg_path, to_path)
 
-    push_msg = f'Make version {version} on  {datetime.date.today().strftime("%Y/%m/%d %H:%M:%S")}  by push'
+    # update version list
+    update_version_list(to_path, output)
+
+    push_msg = f'Make version {_version} on  {datetime.date.today().strftime("%Y/%m/%d %H:%M:%S")}  by push'
 
     # commit to the publishing repo
     run_cmd(f'git add .', output)
@@ -181,74 +215,93 @@ def publish_guru_sdk(version: str, branch: str):
 
     print('===== Publish is done! ======')
 
-    delete_dir(source)
-    delete_dir(output)
+    if clean_mode == 1:
+        delete_dir(source)
+        delete_dir(output)
+    elif clean_mode == 2:
+        for p in additions:
+            delete_dir(p)
+            pass
+    pass
 
+
+# publish sdk vai cil or jenkins
+def publish_sdk_by_cli(publish_branch: str):
+    source = download_source_repo(publish_branch)
+    output = download_output_repo()
+    _publish_sdk(source, output, 1)
+    pass
+
+
+# publish sdk from local cmd from unity project
+def publish_sdk_by_unity(unity_project: str):
+    source = unity_project
+    output = download_output_repo()
+    _publish_sdk(source, output, 2)
+    pass
+
+
+# download unity-gurusdk-dev repo to dest path ( the default pull_branch is 'main' )
+def download_source_repo(pull_branch: str = ''):
+    pwd = os.getcwd()
+    dest = path_join(pwd, 'source')
+
+    # clear source from last pull
+    if os.path.exists(dest):
+        print('clear source at', dest)
+        delete_dir(dest)
+
+    if len(pull_branch) == 0:
+        pull_branch = 'main'
+
+    print('create source at', dest)
+    os.makedirs(dest)
+    run_cmd(f'git clone -b {pull_branch} {SDK_DEV_REPO} .', dest)
+    run_cmd(f'git submodule update --init --recursive', dest)
+
+    return dest
+    pass
+
+
+# download unity-gurusdk-library repo to dest path ( the default pull_branch is 'main' )
+def download_output_repo():
+    pwd = os.getcwd()
+    dest = path_join(pwd, 'output')
+
+    # clear temp lib dir
+    if os.path.exists(dest):
+        print('clear output at', dest)
+        delete_dir(dest)
+
+    # clone lib
+    print('create output at', dest)
+    os.makedirs(dest)
+    run_cmd(f'git clone {SDK_LIB_REPO} .', dest)
+
+    return dest
     pass
 
 
 # download the source proj 'unity-gurusdk-dev'
 # and the output proj 'unity-gurusdk-library'
-def download_all_repos_and_gen_path(version: str, branch: str):
-    pwd = os.getcwd()
-    print('cmd path:', pwd)
-
-    source = os.path.join(pwd, 'source')
-    output = os.path.join(pwd, 'output')
-    to_path = os.path.join(output, version)
-
-    if is_windows_platform():
-        source = source.replace('/', '\\')
-        output = output.replace('/', '\\')
-        to_path = to_path.replace('/', '\\')
-
-
-    # clear source from last pull
-    if os.path.exists(source):
-        print('clear source at', source)
-        delete_dir(source)
-
-    # clear temp lib dir
-    if os.path.exists(output):
-        print('clear output at', output)
-        delete_dir(output)
-
-    # clear same version and will make a new version folder
-    if os.path.exists(to_path):
-        print('clear to_path at', to_path)
-        delete_dir(to_path)
-
-    # default branch
-    if len(branch) == 0:
-        branch = 'main'
-
-    # clone dev
-    print('create source at', source)
-    os.makedirs(source)
-    run_cmd(f'git clone -b {branch} {SDK_DEV_REPO} .', source)
-    run_cmd(f'git submodule update --init --recursive', source)
-
-    # clone lib
-    print('create output at', output)
-    os.makedirs(output)
-    run_cmd(f'git clone {SDK_LIB_REPO} .', output)
-
-    return source, output, to_path
-
+def download_all_repos(dev_branch: str):
+    # download source and output
+    source = download_source_repo(dev_branch)
+    output = download_output_repo()
     pass
 
 
 # collect call upm files from dev_project，
 # and collect them into ‘dev_project/packages’ path
 # all ump repos from GitHub will be cloned
-def collect_all_upm_packages(root_path: str):
+def collect_upm_dependencies_and_version(source_repo_path: str, ):
 
-    sdk_upm_home = os.path.join(root_path, 'packages')
-    unity_proj_path = os.path.join(root_path, UNITY_DEV_PROJECT)
-    packages_path = os.path.join(unity_proj_path, UNITY_PACKAGES_ROOT)
-    # manifest_file = os.path.join(packages_path, "manifest.json")
-    lock_file = os.path.join(packages_path, UNITY_PACKAGES_LOCK_JSON)
-    config_file = os.path.join(packages_path, SDK_CONFIG_JSON)
+    sdk_upm_home = path_join(source_repo_path, 'packages')
+    unity_proj_path = path_join(source_repo_path, UNITY_DEV_PROJECT)
+    packages_path = path_join(unity_proj_path, UNITY_PACKAGES_ROOT)
+    # manifest_file = join_path(packages_path, "manifest.json")
+    lock_file = path_join(packages_path, UNITY_PACKAGES_LOCK_JSON)
+    config_file = path_join(packages_path, SDK_CONFIG_JSON)
 
     if not os.path.exists(config_file):
         print('can not found <sdk-config>', config_file)
@@ -258,53 +311,93 @@ def collect_all_upm_packages(root_path: str):
         print('can not found <packages-lock>', lock_file)
         return None
 
-    with open(lock_file, 'r') as f1:
-        lock_data = json.loads(f1.read())
+    f = read_file(config_file)
+    sdk_config = json.loads(f)
+    version = sdk_config['version']
+    run_cmd(f"cp {config_file} {path_join(sdk_upm_home, SDK_CONFIG_JSON)}")
 
-    # with open(config_file, 'r') as f2:
-    #     sdk_config = json.dumps(f2.read())
-    #     print('sdk-config', sdk_config)
+    # parse packages-lock.json
+    f = read_file(lock_file)
+    lock_data = json.loads(f)
+    additions = []
+    for pkg_id in lock_data['dependencies']:
 
-        for pkg_id in lock_data['dependencies']:
+        item = lock_data['dependencies'][pkg_id]
 
-            item = lock_data['dependencies'][pkg_id]
+        if item is None:
+            continue
 
-            if item is None:
-                continue
+        if item['source'] == 'git':
+            # git upm
+            # hash = item['hash']
+            git_url = item['version']
+            to_path = path_join(sdk_upm_home, pkg_id)
 
-            if item['source'] == 'git':
-                # git upm
-                # hash = item['hash']
-                git_url = item['version']
-                to_path = os.path.join(sdk_upm_home, pkg_id)
+            if not os.path.exists(to_path):
+                os.mkdir(to_path)
 
-                if not os.path.exists(to_path):
-                    os.mkdir(to_path)
+            if '#' in git_url:
+                raw = git_url.split('#')
+                git_url = raw[0]
+                tag = raw[1]
+                sc = f'git clone -b {tag} --depth 1 {git_url} .'
+            else:
+                sc = f'git clone --depth 1 {git_url} .'
 
-                if '#' in git_url:
-                    raw = git_url.split('#')
-                    git_url = raw[0]
-                    tag = raw[1]
-                    sc = f'git clone -b {tag} --depth 1 {git_url} .'
-                else:
-                    sc = f'git clone --depth 1 {git_url} .'
-
-                # clone
-                run_cmd(sc, to_path)
-
-                pass
+            # clone
+            run_cmd(sc, to_path)
+            additions.append(to_path)
             pass
-        run_cmd(f"cp {config_file} {os.path.join(sdk_upm_home, SDK_CONFIG_JSON)}")
         pass
+
+    return version, additions
+    pass
+
+
+# update current version info into version_list file
+def update_version_list(to_path: str, out_path: str):
+
+    cfg_path = path_join(to_path, SDK_CONFIG_JSON)
+    if not os.path.exists(cfg_path):
+        print('file not found:', cfg_path)
+        exit(-1)
+
+    sdk_config = json.loads(read_file(cfg_path))
+    if sdk_config is None:
+        print('parse sdk-config with wrong value')
+        exit(-10)
+
+    sdk_version = sdk_config['version']
+    desc = sdk_config['desc']
+
+    file_path = path_join(out_path, VERSION_LIST)
+
+    # try to load or create version_list.json
+    if os.path.exists(file_path):
+        t = read_file(file_path)
+        version_list = json.loads(t)
+    else:
+        version_list = {'latest': '', 'versions': {}}
+
+    version_list['latest'] = sdk_version
+    version_list['versions'][sdk_version] = {}
+    version_list['versions'][sdk_version]['ts'] = int(datetime.datetime.today().timestamp())
+
+    if len(desc) > 0:
+        version_list['versions'][sdk_version]['desc'] = desc
+
+    write_file(file_path, json.dumps(version_list))
     pass
 
 
 # init all the args from input
 def init_args():
     parser = argparse.ArgumentParser(description='guru-sdk cli tool')
-    parser.add_argument('action', type=str, help='sync,publish,debug_source')
+    parser.add_argument('action', type=str, help='sync, install, publish, quick_publish, delete_version, debug_source')
     parser.add_argument('--version', type=str, help='version for publish')
-    parser.add_argument('--branch', type=str, help='branch for dev project')
+    parser.add_argument('--branch', type=str, help='branch for pulling all library repo')
+    parser.add_argument('--source_path', type=str, help='local source dev project path')
+
     return parser.parse_args()
 
 
@@ -318,25 +411,49 @@ if __name__ == '__main__':
     action = args.action
     version = args.version
     branch = args.branch
+    source_path = args.source_path
 
+    # only sync version on client
     if action == 'sync':
         # sync the latest version of guru_sdk
         sync_sdk()
+        pass
+    # sync and then install selected version for client
+    if action == 'install':
+        if len(version) == 0:
+            print('wrong version format')
+            version = 'latest'
+            pass
+        pass
+
+    # publish version by jenkins
     elif action == 'publish':
         # publish sdk with special version
-        if len(version) == 0:
-            print('wrong version format')
-        elif len(branch) == 0:
-            print('wrong branch name')
+        if len(branch) == 0:
+            print('empty branch name')
+            branch = 'publish'
         else:
-            publish_guru_sdk(version, branch)
+            publish_sdk_by_cli(branch)
+        pass
 
-    elif action == 'debug_source':
-        if len(version) == 0:
-            print('wrong version format')
-        elif len(branch) == 0:
-            print('wrong branch name')
+    # publish version directly from unity
+    elif action == 'quick_publish':
+        # publish sdk by unity project inside cmd
+        if len(source_path) == 0:
+            print('empty source_path, make sure you were on the right path!')
+            exit(-21)
         else:
-            download_all_repos_and_gen_path(version, branch)
+            publish_sdk_by_unity(source_path)
+        pass
+
+    # only download repos for debug
+    elif action == 'debug_source':
+        if len(branch) == 0:
+            print('empty branch name')
+            branch = 'main'
+        else:
+            download_all_repos(branch)
+
+    # print('get ts', int(datetime.datetime.today().timestamp()))
 
     pass
