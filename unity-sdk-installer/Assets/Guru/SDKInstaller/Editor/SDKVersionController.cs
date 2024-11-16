@@ -1,5 +1,6 @@
 
 
+
 namespace Guru.SDK
 {
     using System;
@@ -16,7 +17,8 @@ namespace Guru.SDK
     {
         private const string UPM_HOME = ".upm";
         private const string GURU_UNITY_CLI_NAME = "guru_unity_cli.py";
-        private const string CMD_NAME = "cmd.command";
+        private const string OSX_CMD_NAME = "cmd.command";
+        private const string WIN_CMD_NAME = "cmd.bat";
         private const string ARGS_NAME = "args";
         private const string SDK_HOME = ".guru/unity";
         private const string SDK_LIB_NAME = "guru-sdk";
@@ -34,6 +36,18 @@ namespace Guru.SDK
 
         private static readonly string VersionListDocPath = Path.GetFullPath($"{Workspace}/version_list.json");
 
+
+        private string CmdName
+        {
+            get
+            {
+                var cmdName = OSX_CMD_NAME;
+#if UNITY_EDITOR_WIN
+                cmdName += WIN_CMD_NAME;
+#endif
+                return cmdName;
+            }
+        }
 
         private SDKConfigFile _configFile;
         private SDKVersionListDoc _versionList;
@@ -293,8 +307,8 @@ namespace Guru.SDK
 
         private void EnsureCMDFile()
         {
-            string from = Path.Combine(_pluginHome, $"File/{CMD_NAME}");
-            string to = Path.Combine(Workspace, CMD_NAME);
+            string from = Path.Combine(_pluginHome, $"File/{CmdName}");
+            string to = Path.Combine(Workspace, CmdName);
 
             if (File.Exists(to)) return;
             File.Copy(from, to);
@@ -303,8 +317,8 @@ namespace Guru.SDK
 
         public void RunCmd()
         {
-            var cmdFile = Path.Combine(Workspace, CMD_NAME);
-            Application.OpenURL($"file://{cmdFile}");
+            var cmdPath = Path.Combine(Workspace, CmdName);
+            Application.OpenURL($"file://{cmdPath}");
         }
 
 
@@ -314,19 +328,36 @@ namespace Guru.SDK
         /// <param name="versionName"></param>
         public void RunInstallSDK(string versionName)
         {
-            List<string> lines = new List<string>()
+            // 写入文件命令
+            WriteCMDArgs(new Dictionary<string, string>()
             {
-                $"export RUN_MODE=install",
-                $"export UNITY_PROJECT={Path.GetFullPath(Application.dataPath + "/../")}",
-                $"export SDK_VERSION={versionName}",
-                $"export PKG_LIST={null}"
-            };
-
-            var path = Path.Combine(Workspace, ARGS_NAME);
-            File.WriteAllLines(path, lines);
-
+                {"RUN_MODE", "install"} ,
+                {"UNITY_PROJECT", Path.GetFullPath(Application.dataPath + "/../")},
+                {"SDK_VERSION", versionName},
+                {"PKG_LIST", "null"},
+            });
+            
             RunCmd();
         }
+
+
+        private void WriteCMDArgs(Dictionary<string, string> args)
+        {
+            List<string> lines = new List<string>(args.Count);
+            string filePath = Path.Combine(Workspace, ARGS_NAME);
+            foreach (var kvp in args)
+            {
+#if UNITY_EDITOR_OSX
+                lines.Add($"export {kvp.Key}={kvp.Value}");
+#elif UNITY_EDITOR_WIN
+                lines.Add($"set {kvp.Key}={kvp.Value}");
+                filePath = filePath + ".bat";
+#endif
+            }
+            File.WriteAllLines(filePath, lines);
+        }
+
+
 
 
 

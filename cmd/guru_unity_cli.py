@@ -1,4 +1,5 @@
-#!/usr/bin/python3
+#! /usr/bin/python3
+# coding=utf-8
 
 import argparse
 import os
@@ -22,6 +23,10 @@ VERSION_LIST = 'version_list.json'  # SDK 版本描述文件
 
 __user_sdk_home: str = ''
 
+global __cur_dir
+__cur_dir: str = ''
+
+
 
 # ---------------------- UTILS ----------------------
 # call cmd
@@ -38,9 +43,12 @@ def run_cmd(cmdline: str,
 
 
 # delete full dir
-def delete_dir(dir_path:str):
+def delete_dir(dir_path: str):
     if os.path.exists(dir_path):
-        shutil.rmtree(dir_path)
+        if is_windows_platform():
+            run_cmd(f'rd /s /q {dir_path}')
+        else:
+            shutil.rmtree(dir_path)
     else:
         print('dir is not exist:', dir_path)
     pass
@@ -171,9 +179,6 @@ def install_sdk(unity_proj_path: str, version: str, pkg_list: list):
     pass
 
 
-
-
-
 # load manifest.json -> jsonObject
 def load_unity_manifest_json(path: str):
     with open(path, 'r') as f:
@@ -251,8 +256,7 @@ def publish_sdk_by_unity(unity_project: str):
 
 # download unity-gurusdk-dev repo to dest path ( the default pull_branch is 'main' )
 def download_source_repo(pull_branch: str = ''):
-    pwd = os.getcwd()
-    dest = path_join(pwd, 'source')
+    dest = path_join(__cur_dir, 'source')
 
     # clear source from last pull
     if os.path.exists(dest):
@@ -264,7 +268,7 @@ def download_source_repo(pull_branch: str = ''):
 
     print('create source at', dest)
     os.makedirs(dest)
-    run_cmd(f'git clone -b {pull_branch} {SDK_DEV_REPO} .', dest)
+    run_cmd(f'git clone -b {pull_branch} --depth=1 {SDK_DEV_REPO} .', dest)
     run_cmd(f'git submodule update --init --recursive', dest)
 
     return dest
@@ -273,8 +277,9 @@ def download_source_repo(pull_branch: str = ''):
 
 # download unity-gurusdk-library repo to dest path ( the default pull_branch is 'main' )
 def download_output_repo():
-    pwd = os.getcwd()
-    dest = path_join(pwd, 'output')
+    print('download_output_repo -> pwd', __cur_dir)
+    dest = path_join(__cur_dir, 'output')
+    print('dest', dest)
 
     # clear temp lib dir
     if os.path.exists(dest):
@@ -401,7 +406,7 @@ def update_version_list(to_path: str, out_path: str):
 # init all the args from input
 def init_args():
     parser = argparse.ArgumentParser(description='guru-sdk cli tool')
-    parser.add_argument('action', type=str, help='sync, install, publish, quick_publish, delete_version, debug_source')
+    parser.add_argument('action', type=str, help='sync, install, publish, quick_publish, delete_version, debug_source, test')
     parser.add_argument('--version', type=str, help='version for publish')
     parser.add_argument('--branch', type=str, help='branch for pulling all library repo')
     parser.add_argument('--source_path', type=str, help='local source dev project path')
@@ -415,15 +420,17 @@ def init_args():
 if __name__ == '__main__':
     print(f'========== Welcome to GuruSdk CLI [{VERSION}] ==========')
     args = init_args()
+    __cur_dir = os.getcwd()
     print('OS', os.name)
     print('Action:', args.action)
+    print('PWD', __cur_dir)
 
-    action = args.action
-    version = args.version
-    branch = args.branch
-    source_path = args.source_path
-    pkgs = args.pkgs
-    proj = args.proj
+    action: str = args.action
+    version: str = args.version
+    branch: str = args.branch
+    source_path: str = args.source_path
+    pkgs: str = args.pkgs
+    proj: str = args.proj
 
     # only sync version on client
     if action == 'sync':
@@ -449,8 +456,6 @@ if __name__ == '__main__':
                 pkg_list = f.readlines()
                 pass
             pass
-
-
         pass
 
     # publish version by jenkins
@@ -475,11 +480,16 @@ if __name__ == '__main__':
 
     # only download repos for debug
     elif action == 'debug_source':
-        if len(branch) == 0:
+        if branch is None or len(branch) == 0:
             print('empty branch name')
             branch = 'main'
         else:
             download_all_repos(branch)
+
+    elif action == 'test':
+        cp = os.getcwd()
+        print('current path', cp)
+        pass
 
     # print('get ts', int(datetime.datetime.today().timestamp()))
 

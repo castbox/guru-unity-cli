@@ -106,8 +106,7 @@ namespace Guru.SDK
 
 
         #endregion
-
-
+        
         #region GUI
 
         private void OnGUI()
@@ -131,8 +130,7 @@ namespace Guru.SDK
         }
 
         #endregion
-
-
+        
         #region GUI Title
 
         private void DrawTitle()
@@ -152,7 +150,6 @@ namespace Guru.SDK
 
         #endregion
         
-
         #region GUI Loading
 
         private void DrawLoading()
@@ -299,7 +296,6 @@ namespace Guru.SDK
 
         #endregion
         
-
         #region GUI Utils
 
         private GUIStyle GetStyleBox()
