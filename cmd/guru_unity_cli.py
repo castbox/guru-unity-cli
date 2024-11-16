@@ -22,6 +22,7 @@ VERSION_LIST = 'version_list.json'  # SDK 版本描述文件
 
 __user_sdk_home: str = ''
 
+
 # ---------------------- UTILS ----------------------
 # call cmd
 def run_cmd(cmdline: str,
@@ -50,7 +51,7 @@ def ensure_dir(dir_path: str):
     if os.path.exists(dir_path):
         return
 
-    os.mkdir(dir_path)
+    os.makedirs(dir_path)
 
 
 def get_user_home():
@@ -100,9 +101,14 @@ def write_file(path: str, content: str):
         f.close()
 
 
-
-
 # ---------------------- SYNC ----------------------
+
+# sync and install sdk from local cache
+def sync_and_install_sdk(unity_proj: str, version: str, plg_list: list):
+
+
+    pass
+
 # download latest sdk
 def sync_sdk():
     sdk_home = get_sdk_home()
@@ -118,7 +124,7 @@ def sync_sdk():
 
 
 # sync latest sdk repo to the path '~/.guru/unity/guru-sdk'
-def sync_and_install_sdk(unity_proj_path: str):
+def install_sdk(unity_proj_path: str, version: str, pkg_list: list):
 
     sdk_home = get_sdk_home()
     upm_root = path_join(unity_proj_path, f'{UNITY_PACKAGES_ROOT}/{UPM_ROOT_NAME}')
@@ -133,7 +139,6 @@ def sync_and_install_sdk(unity_proj_path: str):
     # clean old sdk files
     if os.path.exists(upm_root):
         delete_dir(upm_root)
-
     # re-make .upm dir
     ensure_dir(upm_root)
 
@@ -164,6 +169,9 @@ def sync_and_install_sdk(unity_proj_path: str):
         save_unity_manifest_json(manifest_path, manifest_json)
         pass
     pass
+
+
+
 
 
 # load manifest.json -> jsonObject
@@ -397,6 +405,8 @@ def init_args():
     parser.add_argument('--version', type=str, help='version for publish')
     parser.add_argument('--branch', type=str, help='branch for pulling all library repo')
     parser.add_argument('--source_path', type=str, help='local source dev project path')
+    parser.add_argument('--proj', type=str, help='unity project path')
+    parser.add_argument('--pkgs', type=str, help='package list which will be installed')
 
     return parser.parse_args()
 
@@ -412,6 +422,8 @@ if __name__ == '__main__':
     version = args.version
     branch = args.branch
     source_path = args.source_path
+    pkgs = args.pkgs
+    proj = args.proj
 
     # only sync version on client
     if action == 'sync':
@@ -420,10 +432,25 @@ if __name__ == '__main__':
         pass
     # sync and then install selected version for client
     if action == 'install':
+
+        if not os.path.exists(proj):
+            print(f'Can not found unity project at {proj}')
+            exit(-31)
+            pass
+
         if len(version) == 0:
             print('wrong version format')
             version = 'latest'
             pass
+
+        pkg_list = None
+        if os.path.exists(pkgs):
+            with open(pkgs, 'r') as f:
+                pkg_list = f.readlines()
+                pass
+            pass
+
+
         pass
 
     # publish version by jenkins
