@@ -76,18 +76,7 @@ def get_sdk_home():
     if len(__user_sdk_home) > 0 and os.path.exists(__user_sdk_home):
         return __user_sdk_home
 
-    __user_sdk_home = f'{get_user_home()}/{SDK_HOME_NAME}'
-
-    # if is_windows_platform():
-    #     find_paths = ['D', 'E', 'F', 'G', 'H', 'K', 'L', 'M', 'N', 'O', 'P', 'X', 'Y', 'Z']
-    #     for d in find_paths:
-    #         # print('try find root dir:', d)
-    #         if os.path.exists(f'{d}:\\'):
-    #             __user_sdk_home = f'{d}:\\{SDK_HOME_NAME}'
-    #             break
-    #     pass
-    # else:
-    #     __user_sdk_home = f'{get_user_home()}/{SDK_HOME_NAME}'
+    __user_sdk_home = to_safe_path(f'{get_user_home()}/{SDK_HOME_NAME}')
 
     return __user_sdk_home
 
