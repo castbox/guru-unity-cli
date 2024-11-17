@@ -9,7 +9,7 @@ import datetime
 from os.path import expanduser
 
 # CONSTS
-VERSION = '0.4.0'
+VERSION = '0.4.1'
 SDK_CONFIG_JSON = 'sdk-config.json'  # SDK 开发者定义的 upm 包的配置关系，包含所有包体的可选以及从属关系, [需要配置在 DEV 项目]
 SDK_HOME_NAME = '.guru/unity/guru-sdk'  # 用户设备上缓存 SDK 各个版本的路径
 SDK_LIB_REPO = 'git@github.com:castbox/unity-gurusdk-library.git'  # 线上发布的 SDK 静态库的 repo
@@ -27,7 +27,6 @@ ERROR_WRONG_VERSION = 101
 ERROR_WRONG_SOURCE_PATH = 102
 ERROR_SDK_CONFIG_NOT_FOUND = 103
 
-__user_sdk_home: str = ''
 global __cur_dir
 
 
@@ -71,19 +70,13 @@ def get_user_home():
 
 # get the local path of sdk_home
 def get_sdk_home():
-    global __user_sdk_home
-
-    if len(__user_sdk_home) > 0 and os.path.exists(__user_sdk_home):
-        return __user_sdk_home
-
-    __user_sdk_home = to_safe_path(f'{get_user_home()}/{SDK_HOME_NAME}')
-
-    return __user_sdk_home
+    return to_safe_path(f'{get_user_home()}/{SDK_HOME_NAME}')
 
 
 # check is running on windows sys
 def is_windows_platform():
     return os.name == 'nt'
+
 
 def is_str_empty(txt: str):
     if txt is None:
