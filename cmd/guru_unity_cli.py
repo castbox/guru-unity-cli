@@ -9,7 +9,7 @@ import datetime
 from os.path import expanduser
 
 # CONSTS
-VERSION = '0.1.0'
+VERSION = '0.4.0'
 SDK_CONFIG_JSON = 'sdk-config.json'  # SDK 开发者定义的 upm 包的配置关系，包含所有包体的可选以及从属关系, [需要配置在 DEV 项目]
 SDK_HOME_NAME = '.guru/unity/guru-sdk'  # 用户设备上缓存 SDK 各个版本的路径
 SDK_LIB_REPO = 'git@github.com:castbox/unity-gurusdk-library.git'  # 线上发布的 SDK 静态库的 repo
@@ -21,11 +21,13 @@ UNITY_PACKAGES_ROOT = 'Packages'  # unity 项目自身的 UPM 包清单文件
 UNITY_DEV_PROJECT = 'GuruSDKDev'  # unity 开发项目中 Unity 工程路径的二级目录
 VERSION_LIST = 'version_list.json'  # SDK 版本描述文件
 
+ERROR_UNITY_PROJECT_NOT_FOUND = 100
+ERROR_WRONG_VERSION = 101
+ERROR_WRONG_SOURCE_PATH = 102
+ERROR_SDK_CONFIG_NOT_FOUND = 103
+
 __user_sdk_home: str = ''
-
 global __cur_dir
-__cur_dir: str = ''
-
 
 
 # ---------------------- UTILS ----------------------
@@ -69,8 +71,22 @@ def get_user_home():
 # get the local path of sdk_home
 def get_sdk_home():
     global __user_sdk_home
-    if len(__user_sdk_home) == 0:
-        __user_sdk_home = path_join(get_user_home(), SDK_HOME_NAME)
+
+    if len(__user_sdk_home) > 0 and os.path.exists(__user_sdk_home):
+        return __user_sdk_home
+
+    __user_sdk_home = f'{get_user_home()}/{SDK_HOME_NAME}'
+
+    # if is_windows_platform():
+    #     find_paths = ['D', 'E', 'F', 'G', 'H', 'K', 'L', 'M', 'N', 'O', 'P', 'X', 'Y', 'Z']
+    #     for d in find_paths:
+    #         # print('try find root dir:', d)
+    #         if os.path.exists(f'{d}:\\'):
+    #             __user_sdk_home = f'{d}:\\{SDK_HOME_NAME}'
+    #             break
+    #     pass
+    # else:
+    #     __user_sdk_home = f'{get_user_home()}/{SDK_HOME_NAME}'
 
     return __user_sdk_home
 
@@ -112,10 +128,19 @@ def write_file(path: str, content: str):
 # ---------------------- SYNC ----------------------
 
 # sync and install sdk from local cache
-def sync_and_install_sdk(unity_proj: str, version: str, plg_list: list):
+def sync_and_install_sdk(unity_proj: str, version: str):
+    sdk_home = get_sdk_home()
+    version_dir = path_join(sdk_home, version)
 
+    if not os.path.exists(sdk_home):
+        sync_sdk()
 
+    if not os.path.exists(version_dir):
+        sync_sdk()
+
+    install_sdk(unity_proj, version)
     pass
+
 
 # download latest sdk
 def sync_sdk():
@@ -132,16 +157,17 @@ def sync_sdk():
 
 
 # sync latest sdk repo to the path '~/.guru/unity/guru-sdk'
-def install_sdk(unity_proj_path: str, version: str, pkg_list: list):
+def install_sdk(unity_proj_path: str, version: str):
 
     sdk_home = get_sdk_home()
+    version_home = path_join(sdk_home, version)
     upm_root = path_join(unity_proj_path, f'{UNITY_PACKAGES_ROOT}/{UPM_ROOT_NAME}')
     manifest_path = path_join(unity_proj_path, f'{UNITY_PACKAGES_ROOT}/{UNITY_MANIFEST_JSON}')
-    sdk_config = path_join(unity_proj_path, f'{UNITY_PACKAGES_ROOT}/{SDK_CONFIG_JSON}')
+    sdk_config = path_join(version_home, SDK_CONFIG_JSON)
 
     if not os.path.exists(sdk_config):
-        print("user has not choose any package yet, no packages will be install")
-        return
+        print(f'sdk-config not found:: \n{sdk_config}')
+        exit(ERROR_SDK_CONFIG_NOT_FOUND)
         pass
 
     # clean old sdk files
@@ -154,27 +180,43 @@ def install_sdk(unity_proj_path: str, version: str, pkg_list: list):
     if manifest_json is None:
         return
 
-    with open(sdk_config, 'r') as f:
-        cfg = json.loads(f.read())
+    # install all packages from sdk-config
+    with open(sdk_config, 'r', encoding='utf-8') as f:
+        txt = f.read()
+        print(txt)
 
-        if cfg or cfg['packages'] is None:
+        cfg = json.loads(txt)
+
+        if cfg is None or cfg['packages'] is None:
             print('json parse error with', sdk_config, 'plz fix the errors')
             return
 
         for p in cfg['packages']:
-            in_path = path_join(sdk_home, p)
+            in_path = path_join(version_home, p)
             if not os.path.exists(in_path):
                 print(f'package [{p}] not found, skip install...')
                 continue
 
-            run_cmd(f'ln -s {in_path} {p}', upm_root)
             print('Add package at path: ', in_path)
+            make_softlink(in_path, p, upm_root)
 
             # record deps
             manifest_json['dependencies'][p] = f'file:{UPM_ROOT_NAME}/{p}'
             pass
         # save the manifest file
         save_unity_manifest_json(manifest_path, manifest_json)
+        pass
+    pass
+
+
+# create softlink with os cmd
+def make_softlink(source_path: str, link_name: str, dest_dir: str):
+    if is_windows_platform():
+        # run_cmd(f'mklink /D {dest_dir}\\{link_name} {source_path}')
+        os.symlink(source_path, f'{dest_dir}/{link_name}')
+        pass
+    else:
+        run_cmd(f'ln -s {source_path} {link_name}', dest_dir)
         pass
     pass
 
@@ -424,6 +466,7 @@ if __name__ == '__main__':
     print('OS', os.name)
     print('Action:', args.action)
     print('PWD', __cur_dir)
+    print('SDK_HOME', get_sdk_home())
 
     action: str = args.action
     version: str = args.version
@@ -439,24 +482,17 @@ if __name__ == '__main__':
         pass
     # sync and then install selected version for client
     if action == 'install':
-
         if not os.path.exists(proj):
             print(f'Can not found unity project at {proj}')
-            exit(-31)
+            exit(ERROR_UNITY_PROJECT_NOT_FOUND)
             pass
 
         if len(version) == 0:
             print('wrong version format')
-            version = 'latest'
+            exit(ERROR_WRONG_VERSION)
             pass
 
-        pkg_list = None
-        if os.path.exists(pkgs):
-            with open(pkgs, 'r') as f:
-                pkg_list = f.readlines()
-                pass
-            pass
-        pass
+        sync_and_install_sdk(proj, version)
 
     # publish version by jenkins
     elif action == 'publish':
@@ -473,7 +509,7 @@ if __name__ == '__main__':
         # publish sdk by unity project inside cmd
         if len(source_path) == 0:
             print('empty source_path, make sure you were on the right path!')
-            exit(-21)
+            exit(ERROR_WRONG_SOURCE_PATH)
         else:
             publish_sdk_by_unity(source_path)
         pass
