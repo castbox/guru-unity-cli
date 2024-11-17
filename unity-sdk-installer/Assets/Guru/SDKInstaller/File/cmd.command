@@ -6,19 +6,24 @@ cd $DIR
 
 source ./args
 
-CLI=~/.guru/unity/guru_unity_cli.py
+export CLI=~/.guru/unity/guru_unity_cli.py
+export PY=python3
+export CLI_URL=https://raw.githubusercontent.com/castbox/guru-unity-cli/refs/heads/main/cmd/guru_unity_cli.py
 
+# download cli file
 if [ ! -f "$CLI" ]; then
-
   echo "download guru_unity_cli"
-  # curl -L https://raw.githubusercontent.com/castbox/guru-unity-cli/refs/heads/main/cmd/guru_unity_cli.py?token=GHSAT0AAAAAACUSDGU7I7O6MQZF6RH3MPO4ZZUUINA -o $CLI 
-  
+  curl -L $CLI_URL -o $CLI 
 fi 
 
 if [ "$RUN_MODE" = "install" ]; then
-  
-  python3 ~/.guru/unity/guru_unity_cli.py install --version $SDK_VERSION  --unity_proj "$UNITY_PROJECT"
-  
+  # install sdk
+  $PY $CLI install --version $VERSION  --proj "$PROJECT"
+elif [ "$RUN_MODE" = "sync" ]; then
+  # sync sdk into local
+  $PY $CLI sync
+elif [ "$RUN_MODE" = "debug" ]; then  
+  $PY $CLI debug_source --branch $BRANCH
 fi  
 
 

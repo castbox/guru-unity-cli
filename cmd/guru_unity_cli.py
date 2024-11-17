@@ -20,6 +20,7 @@ UNITY_PACKAGES_LOCK_JSON = 'packages-lock.json'  # unity 项目自身的 UPM 包
 UNITY_PACKAGES_ROOT = 'Packages'  # unity 项目自身的 UPM 包清单文件
 UNITY_DEV_PROJECT = 'GuruSDKDev'  # unity 开发项目中 Unity 工程路径的二级目录
 VERSION_LIST = 'version_list.json'  # SDK 版本描述文件
+LOG_TXT = 'log.txt'
 
 ERROR_UNITY_PROJECT_NOT_FOUND = 100
 ERROR_WRONG_VERSION = 101
@@ -91,12 +92,21 @@ def get_sdk_home():
     return __user_sdk_home
 
 
+# check is running on windows sys
 def is_windows_platform():
     return os.name == 'nt'
 
+def is_str_empty(txt: str):
+    if txt is None:
+        return True
+
+    if len(txt) == 0:
+        return True
+
+    return False
 
 def path_join(path1: str, path2: str):
-    p =  os.path.join(path1, path2)
+    p = os.path.join(path1, path2)
     return to_safe_path(p)
 
 
@@ -120,13 +130,25 @@ def read_file(path: str):
 
 # write sth into a file
 def write_file(path: str, content: str):
-    with open(path, 'w') as f:
+    with open(path, 'w', encoding='utf-8') as f:
         f.write(content)
         f.close()
 
 
-# ---------------------- SYNC ----------------------
+def output_log_txt(txt: str):
+    path = f'{__cur_dir}/{LOG_TXT}'
+    write_file(path, txt)
 
+
+def output_success(content: str):
+    if is_str_empty(content):
+        content = '...'
+
+    txt = f'success for {content}'
+    output_log_txt(txt)
+
+
+# ---------------------- SYNC ----------------------
 # sync and install sdk from local cache
 def sync_and_install_sdk(unity_proj: str, version: str):
     sdk_home = get_sdk_home()
@@ -146,6 +168,7 @@ def sync_and_install_sdk(unity_proj: str, version: str):
 def sync_sdk():
     sdk_home = get_sdk_home()
 
+    # only support for quick clone, so every time it will remove all files, then clone it again
     if os.path.exists(sdk_home):
         # remove old files
         delete_dir(sdk_home)
@@ -153,6 +176,7 @@ def sync_sdk():
 
     os.makedirs(sdk_home)
     run_cmd(f'git clone --depth 1 {SDK_LIB_REPO} .', sdk_home)
+    output_success('sync complete')
     pass
 
 
@@ -207,6 +231,8 @@ def install_sdk(unity_proj_path: str, version: str):
         save_unity_manifest_json(manifest_path, manifest_json)
         pass
     pass
+
+    output_success('install complete')
 
 
 # create softlink with os cmd
@@ -343,6 +369,7 @@ def download_all_repos(dev_branch: str):
     # download source and output
     source = download_source_repo(dev_branch)
     output = download_output_repo()
+    output_success('download complete')
     pass
 
 
@@ -483,7 +510,7 @@ if __name__ == '__main__':
     # sync and then install selected version for client
     if action == 'install':
         if not os.path.exists(proj):
-            print(f'Can not found unity project at {proj}')
+            print(f'Can not found unity project at\n{proj}')
             exit(ERROR_UNITY_PROJECT_NOT_FOUND)
             pass
 

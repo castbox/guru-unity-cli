@@ -233,7 +233,6 @@ namespace Guru.SDK
                 
                 GUILayout.Space(4);
                 
-                
                 var sdkHome = _controller.GetSDKVersionHome(verName);
                 if (Directory.Exists(sdkHome))
                 {
@@ -253,8 +252,6 @@ namespace Guru.SDK
                         _controller.RunInstallSDK(verName);
                     }, 40, Color.yellow);
                 }
-
-                
                 
             }
         }

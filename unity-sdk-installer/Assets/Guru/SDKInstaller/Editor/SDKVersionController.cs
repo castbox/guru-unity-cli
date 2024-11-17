@@ -35,7 +35,7 @@ namespace Guru.SDK
             Path.GetFullPath($"{Application.dataPath}/../Library/guru-sdk-installer");
 
         private static readonly string VersionListDocPath = Path.GetFullPath($"{Workspace}/version_list.json");
-
+        private static readonly string UnityProjectHome = Path.GetFullPath($"{Application.dataPath}/../");
 
         private string CmdName
         {
@@ -43,7 +43,7 @@ namespace Guru.SDK
             {
                 var cmdName = OSX_CMD_NAME;
 #if UNITY_EDITOR_WIN
-                cmdName += WIN_CMD_NAME;
+                cmdName = WIN_CMD_NAME;
 #endif
                 return cmdName;
             }
@@ -318,6 +318,7 @@ namespace Guru.SDK
         public void RunCmd()
         {
             var cmdPath = Path.Combine(Workspace, CmdName);
+            if(!File.Exists(cmdPath)) EnsureCMDFile();
             Application.OpenURL($"file://{cmdPath}");
         }
 
@@ -332,11 +333,10 @@ namespace Guru.SDK
             WriteCMDArgs(new Dictionary<string, string>()
             {
                 {"RUN_MODE", "install"} ,
-                {"UNITY_PROJECT", Path.GetFullPath(Application.dataPath + "/../")},
-                {"SDK_VERSION", versionName},
-                {"PKG_LIST", "null"},
+                {"PROJECT", UnityProjectHome},
+                {"VERSION", versionName},
             });
-            
+            // 执行脚本
             RunCmd();
         }
 
@@ -351,7 +351,7 @@ namespace Guru.SDK
                 lines.Add($"export {kvp.Key}={kvp.Value}");
 #elif UNITY_EDITOR_WIN
                 lines.Add($"set {kvp.Key}={kvp.Value}");
-                filePath = filePath + ".bat";
+                filePath = Path.Combine(Workspace, $"{ARGS_NAME}.bat");
 #endif
             }
             File.WriteAllLines(filePath, lines);

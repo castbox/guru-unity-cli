@@ -2,3 +2,4 @@
 .idea
 output
 source
+cmd/test/log.txt
