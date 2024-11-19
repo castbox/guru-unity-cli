@@ -394,13 +394,17 @@ def build_version_packages_and_files(source: str, output: str):
     sc = f'git submodule update --init --recursive'
     run_cmd(sc, source)
 
-    # copy submodules into version dir
-    run_cmd(f"cp {config_file} {path_join(submodules, SDK_CONFIG_JSON)}")
+
 
     # clean and rebuild version folder
     dest = path_join(output, version)
     if os.path.exists(dest):
         delete_dir(dest)
+
+    ensure_dir(dest)
+
+    # copy submodules into version dir
+    run_cmd(f"cp {config_file} {path_join(dest, SDK_CONFIG_JSON)}")
 
     # 1. copy all submodules in packages to dest
     for item in os.listdir(submodules):
