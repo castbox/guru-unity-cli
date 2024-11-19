@@ -273,7 +273,7 @@ def publish_and_push(source: str, output: str, clean_mode: int = 0):
     # commit to the publishing repo
     run_cmd(f'git add .', output)
     run_cmd(f'git commit -m \"{push_msg}\"', output)
-    # run_cmd(f'git push', output)
+    run_cmd(f'git push', output)
 
     print('===== Publish is done! ======')
 
