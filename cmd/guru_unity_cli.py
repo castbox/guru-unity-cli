@@ -302,14 +302,13 @@ def publish_sdk_by_cli(publish_branch: str):
 
 # publish sdk from local cmd from unity project
 def publish_from_unity_project(unity_project: str):
-
-    dev_repo = os.path.dirname(unity_project)
-    source = dev_repo
+    print('--- unity_project:', unity_project)
+    source = os.path.dirname(unity_project)
     print('--- source:', source)
-    output = download_output_repo(dev_repo)
+    output = download_output_repo(source)
     print('--- output:', output)
-    publish_and_push(source, output)
-    delete_dir(output)
+    # publish_and_push(source, output)
+    # delete_dir(output)
     pass
 
 
@@ -504,10 +503,10 @@ def debug_test_func():
     ts = datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S")
     print('ts', ts)
 
-    p = '/Users/huyfuei/Workspace/Castbox/SDK/GuruSDK/unity-gurusdk-dev/GuruSDKDev'
+    p = '/Users/huyfuei/Workspace/Castbox/SDK/GuruSDK/unity-gurusdk-dev/GuruSDKDev/'
     root = os.path.dirname(p)
     print('root', root)
-
+    publish_from_unity_project(p)
 
     pass
 
@@ -575,10 +574,16 @@ if __name__ == '__main__':
     # publish version directly from unity
     elif action == 'quick_publish':
         # publish sdk by unity project inside cmd
-        if len(proj) == 0:
+        if is_str_empty(proj):
             print('empty source_path, make sure you were on the right path!')
             exit(ERROR_WRONG_SOURCE_PATH)
         else:
+            if is_windows_platform():
+                if proj[-1] == '\\':
+                    proj = proj[:-2]  # delete end '\\' char
+            else:
+                if proj[-1] == '/':
+                    proj = proj[:-2]  # delete end '/' char
             publish_from_unity_project(proj)
         pass
 
