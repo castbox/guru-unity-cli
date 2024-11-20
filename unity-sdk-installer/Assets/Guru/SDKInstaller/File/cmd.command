@@ -11,10 +11,9 @@ export PY=python3
 export CLI_URL=https://raw.githubusercontent.com/castbox/guru-unity-cli/refs/heads/main/cmd/guru_unity_cli.py
 
 # download cli file
-if [ ! -f "$CLI" ]; then
-  echo "download guru_unity_cli"
-  curl -L $CLI_URL -o $CLI 
-fi 
+echo "download guru_unity_cli"
+curl -L $CLI_URL -o $CLI 
+
 
 if [ "$RUN_MODE" = "install" ]; then
   # install sdk

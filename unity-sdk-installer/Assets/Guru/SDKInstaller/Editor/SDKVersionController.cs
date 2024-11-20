@@ -61,7 +61,7 @@ namespace Guru.SDK
             _pluginHome = GetPluginHome();
             EnsureWorkspace();
             // EnsureGuruCLIFile();
-            EnsureCMDFile();
+            // EnsureCMDFile();
 
             Debug.Log($"Plugin Home: {_pluginHome}");
             Debug.Log($"Workspace: {Workspace}");
@@ -310,13 +310,15 @@ namespace Guru.SDK
             string from = Path.Combine(_pluginHome, $"File/{CmdName}");
             string to = Path.Combine(Workspace, CmdName);
 
-            if (File.Exists(to)) return;
+            if (File.Exists(to)) File.Delete(to);
             File.Copy(from, to);
         }
 
 
         public void RunCmd()
         {
+            EnsureCMDFile();
+            
             var cmdPath = Path.Combine(Workspace, CmdName);
             if(!File.Exists(cmdPath)) EnsureCMDFile();
             Application.OpenURL($"file://{cmdPath}");
