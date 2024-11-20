@@ -9,8 +9,9 @@ import datetime
 from os.path import expanduser
 
 # CONSTS
-VERSION = '0.4.7'
-DESC = 'Fix bug: publish sdk with empty folders. bug: install sdk on windows get Error in batch'
+VERSION = '0.4.8'
+# DESC = 'Fix bug: publish sdk with empty folders. bug: install sdk on windows get Error in batch'
+DESC = 'Fix bugs. update sate: 2024-11-20'
 SDK_CONFIG_JSON = 'sdk-config.json'  # SDK 开发者定义的 upm 包的配置关系，包含所有包体的可选以及从属关系, [需要配置在 DEV 项目]
 SDK_HOME_NAME = '.guru/unity/guru-sdk'  # 用户设备上缓存 SDK 各个版本的路径
 SDK_LIB_REPO = 'git@github.com:castbox/unity-gurusdk-library.git'  # 线上发布的 SDK 静态库的 repo
@@ -302,13 +303,13 @@ def publish_sdk_by_cli(publish_branch: str):
 
 # publish sdk from local cmd from unity project
 def publish_from_unity_project(unity_project: str):
-    print('--- unity_project:', unity_project)
+    # print('--- unity_project:', unity_project)
     source = os.path.dirname(unity_project)
     print('--- source:', source)
     output = download_output_repo(source)
     print('--- output:', output)
-    # publish_and_push(source, output)
-    # delete_dir(output)
+    publish_and_push(source, output)
+    delete_dir(output)
     pass
 
 
@@ -526,8 +527,8 @@ def init_args():
 
 # Entry of the cli.
 if __name__ == '__main__':
-    print(f'========== Welcome to GuruSdk CLI [{VERSION}] ==========')
-    print(f'\nUPDATE:{DESC}\n')
+    print(f'========== Welcome to GuruSDK CLI [{VERSION}] ==========')
+    print(f'UPDATE:{DESC}\n')
     args = init_args()
     print('OS', os.name)
     print('Action:', args.action)
