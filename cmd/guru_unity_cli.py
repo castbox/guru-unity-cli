@@ -28,7 +28,6 @@ ERROR_WRONG_VERSION = 101
 ERROR_WRONG_SOURCE_PATH = 102
 ERROR_SDK_CONFIG_NOT_FOUND = 103
 ERROR_SDK_CONFIG_LOAD_ERROR = 104
-global __cur_dir
 
 
 # ---------------------- UTILS ----------------------
@@ -120,13 +119,13 @@ def write_file(path: str, content: str):
 
 
 def clear_log():
-    path = f'{__cur_dir}/{LOG_TXT}'
+    path = f'{os.getcwd()}/{LOG_TXT}'
     if os.path.exists(path):
         os.remove(path)
 
 
 def save_log_txt(txt: str):
-    path = f'{__cur_dir}/{LOG_TXT}'
+    path = f'{os.getcwd()}/{LOG_TXT}'
     write_file(path, txt)
 
 
@@ -290,9 +289,9 @@ def publish_and_push(source: str, output: str, clean_mode: int = 0):
 # publish sdk vai cil or jenkins
 def publish_sdk_by_cli(publish_branch: str):
     # clean old dirs
-    td = path_join(__cur_dir, 'source')
+    td = path_join(os.getcwd(), 'source')
     delete_dir(td)
-    td = path_join(__cur_dir, 'output')
+    td = path_join(os.getcwd(), 'output')
     delete_dir(td)
     # download all repos
     source = download_source_repo(publish_branch)
@@ -311,7 +310,7 @@ def publish_from_unity_project(unity_project: str):
 
 # download unity-gurusdk-dev repo to dest path ( the default pull_branch is 'main' )
 def download_source_repo(pull_branch: str = ''):
-    dest = path_join(__cur_dir, 'source')
+    dest = path_join(os.getcwd(), 'source')
 
     # clear source from last pull
     if os.path.exists(dest):
@@ -333,7 +332,7 @@ def download_source_repo(pull_branch: str = ''):
 # download unity-gurusdk-library repo to dest path ( the default pull_branch is 'main' )
 def download_output_repo(root: str = ''):
     if is_str_empty(root):
-        root = __cur_dir
+        root = os.getcwd()
 
     print('download_output_repo -> root:', root)
     dest = path_join(root, 'output')
@@ -509,10 +508,9 @@ if __name__ == '__main__':
     print(f'========== Welcome to GuruSdk CLI [{VERSION}] ==========')
     print(f'\nUPDATE:{DESC}\n')
     args = init_args()
-    __cur_dir = os.getcwd()
     print('OS', os.name)
     print('Action:', args.action)
-    print('PWD', __cur_dir)
+    print('PWD', os.getcwd())
     print('SDK_HOME', get_sdk_home())
 
     action: str = args.action
