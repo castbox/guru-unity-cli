@@ -304,8 +304,9 @@ def publish_sdk_by_cli(publish_branch: str):
 def publish_from_unity_project(unity_project: str):
     print('UNITY_PROJ', unity_project)
     source = unity_project
-    output = download_output_repo(path_join(unity_project, '/../'))
+    output = download_output_repo(os.path.dirname(unity_project))
     publish_and_push(source, output, 2)
+    delete_dir(output)
     pass
 
 
