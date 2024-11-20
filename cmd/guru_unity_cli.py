@@ -302,10 +302,12 @@ def publish_sdk_by_cli(publish_branch: str):
 
 # publish sdk from local cmd from unity project
 def publish_from_unity_project(unity_project: str):
-    print('UNITY_PROJ', unity_project)
+
     dev_repo = os.path.dirname(unity_project)
     source = dev_repo
+    print('source:', source)
     output = download_output_repo(dev_repo)
+    print('output:', output)
     publish_and_push(source, output)
     delete_dir(output)
     pass
