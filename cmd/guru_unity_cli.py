@@ -13,7 +13,8 @@ VERSION = '0.4.8'
 # DESC = 'Fix bug: publish sdk with empty folders. bug: install sdk on windows get Error in batch'
 DESC = 'Fix bugs. update sate: 2024-11-20'
 SDK_CONFIG_JSON = 'sdk-config.json'  # SDK 开发者定义的 upm 包的配置关系，包含所有包体的可选以及从属关系, [需要配置在 DEV 项目]
-SDK_HOME_NAME = '.guru/unity/guru-sdk'  # 用户设备上缓存 SDK 各个版本的路径
+SDK_HOME_PATH = '.guru/unity/guru-sdk'  # 用户设备上缓存 SDK 各个版本的路径
+SDK_TEMP_PATH = '.guru/unity/temp'  # 用户设备上临时缓存路径
 SDK_LIB_REPO = 'git@github.com:castbox/unity-gurusdk-library.git'  # 线上发布的 SDK 静态库的 repo
 SDK_DEV_REPO = 'git@github.com:castbox/unity-gurusdk-dev.git'  # SDK 开发者所使用的开发 Repo
 UPM_ROOT_NAME = '.upm'  # 在用户的项目中 Packages 路径下需要建立的文件夹名称
@@ -71,7 +72,7 @@ def get_user_home():
 
 # get the local path of sdk_home
 def get_sdk_home():
-    return to_safe_path(f'{get_user_home()}/{SDK_HOME_NAME}')
+    return to_safe_path(f'{get_user_home()}/{SDK_HOME_PATH}')
 
 
 # check is running on windows sys
@@ -306,7 +307,8 @@ def publish_from_unity_project(unity_project: str):
     # print('--- unity_project:', unity_project)
     source = os.path.dirname(unity_project)
     print('--- source:', source)
-    output = download_output_repo(source)
+    op = path_join(get_user_home(), SDK_TEMP_PATH)
+    output = download_output_repo(op)
     print('--- output:', output)
     publish_and_push(source, output)
     delete_dir(output)
