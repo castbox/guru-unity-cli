@@ -262,7 +262,7 @@ def save_unity_manifest_json(path: str, data: object):
 
 # ---------------------- PUBLISH ----------------------
 # publish the new version
-def publish_and_push(source: str, output: str, clean_mode: int = 0):
+def publish_and_push(source: str, output: str):
     # clone all remote upms
     _version, sdk_config = build_version_packages_and_files(source, output)
 
@@ -296,16 +296,17 @@ def publish_sdk_by_cli(publish_branch: str):
     # download all repos
     source = download_source_repo(publish_branch)
     output = download_output_repo()
-    publish_and_push(source, output, 1)
+    publish_and_push(source, output)
     pass
 
 
 # publish sdk from local cmd from unity project
 def publish_from_unity_project(unity_project: str):
     print('UNITY_PROJ', unity_project)
-    source = unity_project
-    output = download_output_repo(os.path.dirname(unity_project))
-    publish_and_push(source, output, 2)
+    dev_repo = os.path.dirname(unity_project)
+    source = dev_repo
+    output = download_output_repo(dev_repo)
+    publish_and_push(source, output)
     delete_dir(output)
     pass
 
