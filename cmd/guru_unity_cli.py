@@ -119,6 +119,12 @@ def write_file(path: str, content: str):
         f.close()
 
 
+def clear_log():
+    path = f'{__cur_dir}/{LOG_TXT}'
+    if os.path.exists(path):
+        os.remove(path)
+
+
 def save_log_txt(txt: str):
     path = f'{__cur_dir}/{LOG_TXT}'
     write_file(path, txt)
@@ -143,21 +149,14 @@ def log_failed(content: str):
 # ---------------------- SYNC ----------------------
 # sync and install sdk from local cache
 def sync_and_install_sdk(unity_proj: str, version: str):
-    sdk_home = get_sdk_home()
-    version_dir = path_join(sdk_home, version)
-
-    if not os.path.exists(sdk_home):
-        sync_sdk()
-
-    if not os.path.exists(version_dir):
-        sync_sdk()
-
-    install_sdk(unity_proj, version)
+    clear_log()
+    sync_sdk(False)
+    install_sdk_to_project(unity_proj, version)
     pass
 
 
 # download latest sdk
-def sync_sdk():
+def sync_sdk(show_log: bool = True):
     sdk_home = get_sdk_home()
 
     # only support for quick clone, so every time it will remove all files, then clone it again
@@ -168,12 +167,15 @@ def sync_sdk():
 
     os.makedirs(sdk_home)
     run_cmd(f'git clone --depth 1 {SDK_LIB_REPO} .', sdk_home)
-    log_success('sync complete')
+
+    if show_log:
+        log_success('sync complete')
+
     pass
 
 
 # sync latest sdk repo to the path '~/.guru/unity/guru-sdk'
-def install_sdk(unity_proj_path: str, version: str):
+def install_sdk_to_project(unity_proj_path: str, version: str):
     sdk_home = get_sdk_home()
     version_home = path_join(sdk_home, version)
     upm_root = path_join(unity_proj_path, f'{UNITY_PACKAGES_ROOT}/{UPM_ROOT_NAME}')
@@ -521,9 +523,11 @@ if __name__ == '__main__':
 
     # only sync version on client
     if action == 'sync':
+        clear_log()
         # sync the latest version of guru_sdk
         sync_sdk()
         pass
+
     # sync and then install selected version for client
     if action == 'install':
         if not os.path.exists(proj):
