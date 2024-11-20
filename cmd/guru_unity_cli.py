@@ -9,7 +9,7 @@ import datetime
 from os.path import expanduser
 
 # CONSTS
-VERSION = '0.4.6'
+VERSION = '0.4.7'
 DESC = 'Fix bug: publish sdk with empty folders. bug: install sdk on windows get Error in batch'
 SDK_CONFIG_JSON = 'sdk-config.json'  # SDK 开发者定义的 upm 包的配置关系，包含所有包体的可选以及从属关系, [需要配置在 DEV 项目]
 SDK_HOME_NAME = '.guru/unity/guru-sdk'  # 用户设备上缓存 SDK 各个版本的路径
@@ -305,9 +305,9 @@ def publish_from_unity_project(unity_project: str):
 
     dev_repo = os.path.dirname(unity_project)
     source = dev_repo
-    print('source:', source)
+    print('--- source:', source)
     output = download_output_repo(dev_repo)
-    print('output:', output)
+    print('--- output:', output)
     publish_and_push(source, output)
     delete_dir(output)
     pass
@@ -497,6 +497,22 @@ def debug_repos(branch: str):
     build_version_packages_and_files(source, output)
 
 
+def debug_test_func():
+    cp = os.getcwd()
+    print('current path', cp)
+
+    ts = datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S")
+    print('ts', ts)
+
+    p = '/Users/huyfuei/Workspace/Castbox/SDK/GuruSDK/unity-gurusdk-dev/GuruSDKDev'
+    root = os.path.dirname(p)
+    print('root', root)
+
+
+    pass
+
+
+# ======================================================================================================================
 # init all the args from input
 def init_args():
     parser = argparse.ArgumentParser(description='guru-sdk cli tool')
@@ -575,11 +591,7 @@ if __name__ == '__main__':
             debug_repos(branch)
     # test function
     elif action == 'test':
-        cp = os.getcwd()
-        print('current path', cp)
-
-        ts = datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S")
-        print('ts', ts)
+        debug_test_func()
         pass
 
     # print('get ts', int(datetime.datetime.today().timestamp()))
