@@ -9,7 +9,7 @@ import datetime
 from os.path import expanduser
 
 # CONSTS
-VERSION = '0.4.5'
+VERSION = '0.4.6'
 DESC = 'Fix bug: publish sdk with empty folders. bug: install sdk on windows get Error in batch'
 SDK_CONFIG_JSON = 'sdk-config.json'  # SDK 开发者定义的 upm 包的配置关系，包含所有包体的可选以及从属关系, [需要配置在 DEV 项目]
 SDK_HOME_NAME = '.guru/unity/guru-sdk'  # 用户设备上缓存 SDK 各个版本的路径
@@ -302,6 +302,7 @@ def publish_sdk_by_cli(publish_branch: str):
 
 # publish sdk from local cmd from unity project
 def publish_from_unity_project(unity_project: str):
+    print('UNITY_PROJ', unity_project)
     source = unity_project
     output = download_output_repo(path_join(unity_project, '/../'))
     publish_and_push(source, output, 2)
@@ -332,6 +333,7 @@ def download_source_repo(pull_branch: str = ''):
 # download unity-gurusdk-library repo to dest path ( the default pull_branch is 'main' )
 def download_output_repo(root: str = ''):
     if is_str_empty(root):
+        print('--- empty input root value, set to od')
         root = os.getcwd()
 
     print('download_output_repo -> root:', root)
