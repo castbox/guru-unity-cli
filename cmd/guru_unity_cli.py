@@ -171,7 +171,13 @@ def set_cmd_root(val: str):
 # sync and install sdk from local cache
 def sync_and_install_sdk(unity_proj: str, version: str):
     clear_log()
-    sync_sdk(False)
+
+    path = path_join(get_sdk_home(), VERSION_LIST)
+    local_version_list = json.loads(read_file(path))
+
+    if should_update_sdk(version, str(local_version_list['versions'][version]['ts'])):
+        sync_sdk(False)
+
     install_sdk_to_project(unity_proj, version)
     pass
 
@@ -187,7 +193,7 @@ def should_update_sdk(version: str, ts: str):
     if resp.status_code == 200:
         doc = resp.json()
         for v in doc['versions']:
-            if v == version and str(v['ts']) == ts:
+            if v == version and str(doc['versions'][v]['ts']) == ts:
                 result = False
         pass
 
@@ -204,11 +210,12 @@ def sync_sdk(show_log: bool = True):
         delete_dir(sdk_home)
         pass
     os.makedirs(sdk_home)
+
+    print(f'Clone sdk into {sdk_home}')
     run_cmd(f'git clone --depth 1 {SDK_LIB_REPO} .', sdk_home)
 
     if show_log:
         log_success('sync complete')
-
     pass
 
 
@@ -235,8 +242,7 @@ def install_sdk_to_project(unity_proj_path: str, version: str):
     # install all packages from sdk-config
     with open(sdk_config, 'r', encoding='utf-8') as f:
         txt = f.read()
-        print(txt)
-
+        # print(txt)
         cfg = json.loads(txt)
 
         if cfg is None or cfg['packages'] is None:
@@ -260,11 +266,15 @@ def install_sdk_to_project(unity_proj_path: str, version: str):
         pass
     pass
 
+    # add .gitignore file
+    make_git_ignore(unity_proj_path)
+
     log_success('install complete')
 
 
 def clean_old_soft_links(upm_root: str):
-    if os.path.exists(upm_root):
+    if not os.path.exists(upm_root):
+        print(f'Path not found: {upm_root}')
         exit(ERROR_PATH_NOT_FOUND)
 
     dirs = os.listdir()
@@ -305,6 +315,23 @@ def save_unity_manifest_json(path: str, data: object):
         json_str = json.dumps(data, indent=2)
         f.write(json_str)
         f.close()
+    pass
+
+
+def make_git_ignore(unity_project: str):
+    file = path_join(unity_project, '.gitignore')
+    comments = '# Guru UPM'
+    content = f'{comments}\nPackages/{UPM_PREFIX}*'
+
+    if os.path.exists(file):
+        txt = read_file(file)
+        if comments not in txt:
+            txt = txt + f'\n{content}'
+            write_file(file, txt)
+        pass
+    else:
+        # add ignore line in
+        write_file(file, content)
     pass
 
 

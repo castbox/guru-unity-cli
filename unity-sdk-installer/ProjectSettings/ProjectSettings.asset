@@ -733,8 +733,20 @@ PlayerSettings:
   webGLDecompressionFallback: 0
   webGLPowerPreference: 2
   scriptingDefineSymbols:
-    Android: GURU_SDK_DEV
-    iPhone: GURU_SDK_DEV
+    Android: GURU_SDK_DEV;GURU_DEBUG_CONSOLE;GURU_DEBUG;TextMeshPro
+    EmbeddedLinux: TextMeshPro
+    GameCoreXboxOne: TextMeshPro
+    Lumin: TextMeshPro
+    Nintendo Switch: TextMeshPro
+    PS4: TextMeshPro
+    PS5: TextMeshPro
+    Stadia: TextMeshPro
+    Standalone: TextMeshPro
+    WebGL: TextMeshPro
+    Windows Store Apps: TextMeshPro
+    XboxOne: TextMeshPro
+    iPhone: GURU_SDK_DEV;GURU_DEBUG_CONSOLE;GURU_DEBUG;TextMeshPro
+    tvOS: TextMeshPro
   additionalCompilerArguments: {}
   platformArchitecture: {}
   scriptingBackend: {}
