@@ -227,14 +227,22 @@ namespace Guru.SDK
         {
             return _userData.install_version;
         }
+        
+        public long GetInstallTimestamp()
+        {
+            
+            return _userData.install_ts;
+        }
+
 
         /// <summary>
         /// 设置安装版本
         /// </summary>
         /// <param name="version"></param>
-        public void SetInstalledVersion(string version)
+        /// <param name="timestamp"></param>
+        public void SetInstallDate(string version, long timestamp)
         {
-            _userData.SetInstallVersion(version);
+            _userData.SetInstallData(version, timestamp);
         }
 
 
@@ -331,6 +339,16 @@ namespace Guru.SDK
         /// <param name="versionName"></param>
         public void RunInstallSDK(string versionName)
         {
+            // 本地缓存操作
+            var info = GetVersionInfo(versionName);
+            if (info == null)
+            {
+                throw new ArgumentException($"输入了错误的版本号:{versionName}");
+                return;
+            }
+            _userData.SetInstallData(versionName, info.ts); // 保存安装版本和时间
+
+
             // 写入文件命令
             WriteCMDArgs(new Dictionary<string, string>()
             {
@@ -359,9 +377,15 @@ namespace Guru.SDK
             File.WriteAllLines(filePath, lines);
         }
 
+        #endregion
 
+        #region Utils
 
-
+        private DateTime GetDateFromTimestamp(long ts)
+        {
+            var startTime = new DateTime(1970, 1, 1);
+            return startTime.AddSeconds(ts);
+        }
 
         #endregion
     }

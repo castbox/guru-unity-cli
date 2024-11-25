@@ -6,10 +6,11 @@ import os
 import shutil
 import json
 import datetime
+import requests
 from os.path import expanduser
 
 # CONSTS
-VERSION = '0.4.8'
+VERSION = '0.4.9'
 # DESC = 'Fix bug: publish sdk with empty folders. bug: install sdk on windows get Error in batch'
 DESC = 'Fix bugs. update sate: 2024-11-20'
 SDK_CONFIG_JSON = 'sdk-config.json'  # SDK 开发者定义的 upm 包的配置关系，包含所有包体的可选以及从属关系, [需要配置在 DEV 项目]
@@ -17,12 +18,13 @@ SDK_HOME_PATH = '.guru/unity/guru-sdk'  # 用户设备上缓存 SDK 各个版本
 SDK_TEMP_PATH = '.guru/unity/temp'  # 用户设备上临时缓存路径
 SDK_LIB_REPO = 'git@github.com:castbox/unity-gurusdk-library.git'  # 线上发布的 SDK 静态库的 repo
 SDK_DEV_REPO = 'git@github.com:castbox/unity-gurusdk-dev.git'  # SDK 开发者所使用的开发 Repo
-UPM_ROOT_NAME = '.upm'  # 在用户的项目中 Packages 路径下需要建立的文件夹名称
+UPM_PREFIX = '.upm.'  # 在用户的项目中 Packages 的路径前缀
 UNITY_MANIFEST_JSON = 'manifest.json'  # unity 项目自身的 UPM 包清单文件
 UNITY_PACKAGES_LOCK_JSON = 'packages-lock.json'  # unity 项目自身的 UPM 包清单文件
 UNITY_PACKAGES_ROOT = 'Packages'  # unity 项目自身的 UPM 包清单文件
 UNITY_DEV_PROJECT = 'GuruSDKDev'  # unity 开发项目中 Unity 工程路径的二级目录
 VERSION_LIST = 'version_list.json'  # SDK 版本描述文件
+VERSION_LIST_URL = 'https://raw.githubusercontent.com/castbox/unity-gurusdk-library/refs/heads/main/version_list.json'
 LOG_TXT = 'log.txt'
 
 ERROR_UNITY_PROJECT_NOT_FOUND = 100
@@ -30,6 +32,11 @@ ERROR_WRONG_VERSION = 101
 ERROR_WRONG_SOURCE_PATH = 102
 ERROR_SDK_CONFIG_NOT_FOUND = 103
 ERROR_SDK_CONFIG_LOAD_ERROR = 104
+ERROR_PATH_NOT_FOUND = 405
+
+
+# global cmd_root var
+_cmd_root_path = ''
 
 
 # ---------------------- UTILS ----------------------
@@ -80,7 +87,7 @@ def is_windows_platform():
     return os.name == 'nt'
 
 
-def is_str_empty(txt: str):
+def is_empty_str(txt: str):
     if txt is None:
         return True
 
@@ -121,18 +128,18 @@ def write_file(path: str, content: str):
 
 
 def clear_log():
-    path = f'{os.getcwd()}/{LOG_TXT}'
+    path = f'{get_cmd_root()}/{LOG_TXT}'
     if os.path.exists(path):
         os.remove(path)
 
 
 def save_log_txt(txt: str):
-    path = f'{os.getcwd()}/{LOG_TXT}'
+    path = f'{get_cmd_root()}/{LOG_TXT}'
     write_file(path, txt)
 
 
 def log_success(content: str):
-    if is_str_empty(content):
+    if is_empty_str(content):
         content = '...'
 
     txt = f'success: {content}'
@@ -140,11 +147,24 @@ def log_success(content: str):
 
 
 def log_failed(content: str):
-    if is_str_empty(content):
+    if is_empty_str(content):
         content = '...'
 
     txt = f'failed: {content}'
     save_log_txt(txt)
+
+
+def get_timestamp():
+    return int(datetime.datetime.utcnow().timestamp())
+
+
+def get_cmd_root():
+    return _cmd_root_path
+
+
+def set_cmd_root(val: str):
+    global _cmd_root_path
+    _cmd_root_path = val
 
 
 # ---------------------- SYNC ----------------------
@@ -156,6 +176,24 @@ def sync_and_install_sdk(unity_proj: str, version: str):
     pass
 
 
+def should_update_sdk(version: str, ts: str):
+    if is_empty_str(version) or is_empty_str(ts):
+        return True
+
+    result = True
+
+    # check online version list
+    resp = requests.get(VERSION_LIST_URL)
+    if resp.status_code == 200:
+        doc = resp.json()
+        for v in doc['versions']:
+            if v == version and str(v['ts']) == ts:
+                result = False
+        pass
+
+    return result
+
+
 # download latest sdk
 def sync_sdk(show_log: bool = True):
     sdk_home = get_sdk_home()
@@ -165,7 +203,6 @@ def sync_sdk(show_log: bool = True):
         # remove old files
         delete_dir(sdk_home)
         pass
-
     os.makedirs(sdk_home)
     run_cmd(f'git clone --depth 1 {SDK_LIB_REPO} .', sdk_home)
 
@@ -179,7 +216,7 @@ def sync_sdk(show_log: bool = True):
 def install_sdk_to_project(unity_proj_path: str, version: str):
     sdk_home = get_sdk_home()
     version_home = path_join(sdk_home, version)
-    upm_root = path_join(unity_proj_path, f'{UNITY_PACKAGES_ROOT}/{UPM_ROOT_NAME}')
+    upm_root = path_join(unity_proj_path, UNITY_PACKAGES_ROOT)
     manifest_path = path_join(unity_proj_path, f'{UNITY_PACKAGES_ROOT}/{UNITY_MANIFEST_JSON}')
     sdk_config = path_join(version_home, SDK_CONFIG_JSON)
 
@@ -189,10 +226,7 @@ def install_sdk_to_project(unity_proj_path: str, version: str):
         pass
 
     # clean old sdk files
-    if os.path.exists(upm_root):
-        delete_dir(upm_root)
-    # re-make .upm dir
-    ensure_dir(upm_root)
+    clean_old_soft_links(upm_root)
 
     manifest_json = load_unity_manifest_json(manifest_path)
     if manifest_json is None:
@@ -219,7 +253,7 @@ def install_sdk_to_project(unity_proj_path: str, version: str):
             make_softlink(in_path, p, upm_root)
 
             # record deps
-            manifest_json['dependencies'][p] = f'file:{UPM_ROOT_NAME}/{p}'
+            manifest_json['dependencies'][p] = f'file:{UPM_PREFIX}{p}'
             pass
         # save the manifest file
         save_unity_manifest_json(manifest_path, manifest_json)
@@ -229,14 +263,26 @@ def install_sdk_to_project(unity_proj_path: str, version: str):
     log_success('install complete')
 
 
+def clean_old_soft_links(upm_root: str):
+    if os.path.exists(upm_root):
+        exit(ERROR_PATH_NOT_FOUND)
+
+    dirs = os.listdir()
+    for d in dirs:
+        if d.startswith(UPM_PREFIX):
+            # clean the old softlink
+            delete_dir(path_join(upm_root, d))
+    pass
+
+
 # create softlink with os cmd
 def make_softlink(source_path: str, link_name: str, dest_dir: str):
     if is_windows_platform():
         # run_cmd(f'mklink /D {dest_dir}\\{link_name} {source_path}')
-        os.symlink(source_path, f'{dest_dir}/{link_name}')
+        os.symlink(source_path, f'{dest_dir}/{UPM_PREFIX}{link_name}')
         pass
     else:
-        run_cmd(f'ln -s {source_path} {link_name}', dest_dir)
+        run_cmd(f'ln -s {source_path} {UPM_PREFIX}{link_name}', dest_dir)
         pass
     pass
 
@@ -256,7 +302,7 @@ def load_unity_manifest_json(path: str):
 # save jsonObject -> manifest.json
 def save_unity_manifest_json(path: str, data: object):
     with open(path, 'w') as f:
-        json_str = json.dumps(data)
+        json_str = json.dumps(data, indent=2)
         f.write(json_str)
         f.close()
     pass
@@ -291,9 +337,9 @@ def publish_and_push(source: str, output: str):
 # publish sdk vai cil or jenkins
 def publish_sdk_by_cli(publish_branch: str):
     # clean old dirs
-    td = path_join(os.getcwd(), 'source')
+    td = path_join(get_cmd_root(), 'source')
     delete_dir(td)
-    td = path_join(os.getcwd(), 'output')
+    td = path_join(get_cmd_root(), 'output')
     delete_dir(td)
     # download all repos
     source = download_source_repo(publish_branch)
@@ -317,7 +363,7 @@ def publish_from_unity_project(unity_project: str):
 
 # download unity-gurusdk-dev repo to dest path ( the default pull_branch is 'main' )
 def download_source_repo(pull_branch: str = ''):
-    dest = path_join(os.getcwd(), 'source')
+    dest = path_join(get_cmd_root(), 'source')
 
     # clear source from last pull
     if os.path.exists(dest):
@@ -338,9 +384,9 @@ def download_source_repo(pull_branch: str = ''):
 
 # download unity-gurusdk-library repo to dest path ( the default pull_branch is 'main' )
 def download_output_repo(root: str = ''):
-    if is_str_empty(root):
+    if is_empty_str(root):
         print('--- empty input root value, set to od')
-        root = os.getcwd()
+        root = get_cmd_root()
 
     print('download_output_repo -> root:', root)
     dest = path_join(root, 'output')
@@ -397,13 +443,12 @@ def build_version_packages_and_files(source: str, output: str):
         print('load config error <sdk-config>', config_file)
         exit(ERROR_SDK_CONFIG_LOAD_ERROR)
 
+    sdk_config['ts'] = f'{get_timestamp()}' # write ts on publish date
     version = sdk_config['version']
 
     # pull all submodules
     sc = f'git submodule update --init --recursive'
     run_cmd(sc, source)
-
-
 
     # clean and rebuild version folder
     dest = path_join(output, version)
@@ -483,12 +528,13 @@ def update_version_list(sdk_config: dict, out_path: str):
     else:
         version_list = {'latest': '', 'versions': {}}
 
+    if is_empty_str(desc):
+        desc = 'not set yet'
+
     version_list['latest'] = sdk_version
     version_list['versions'][sdk_version] = {}
-    version_list['versions'][sdk_version]['ts'] = int(datetime.datetime.today().timestamp())
-
-    if len(desc) > 0:
-        version_list['versions'][sdk_version]['desc'] = desc
+    version_list['versions'][sdk_version]['ts'] = get_timestamp()
+    version_list['versions'][sdk_version]['desc'] = desc
 
     write_file(file_path, json.dumps(version_list))
     pass
@@ -500,16 +546,19 @@ def debug_repos(branch: str):
 
 
 def debug_test_func():
-    cp = os.getcwd()
+    cp = get_cmd_root()
     print('current path', cp)
 
-    ts = datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S")
+    time_str = datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S")
+    print('time', time_str)
+
+    ts = int(datetime.datetime.utcnow().timestamp())
     print('ts', ts)
 
-    p = '/Users/huyfuei/Workspace/Castbox/SDK/GuruSDK/unity-gurusdk-dev/GuruSDKDev/'
-    root = os.path.dirname(p)
-    print('root', root)
-    publish_from_unity_project(p)
+    # p = '/Users/huyfuei/Workspace/Castbox/SDK/GuruSDK/unity-gurusdk-dev/GuruSDKDev/'
+    # root = os.path.dirname(p)
+    # print('root', root)
+    # publish_from_unity_project(p)
 
     pass
 
@@ -531,10 +580,14 @@ def init_args():
 if __name__ == '__main__':
     print(f'========== Welcome to GuruSDK CLI [{VERSION}] ==========')
     print(f'UPDATE:{DESC}\n')
+
+    # set cmd root from cmd
+    set_cmd_root(os.getcwd())
+
     args = init_args()
     print('OS', os.name)
     print('Action:', args.action)
-    print('PWD', os.getcwd())
+    print('CMD_ROOT', get_cmd_root())
     print('SDK_HOME', get_sdk_home())
 
     action: str = args.action
@@ -564,6 +617,11 @@ if __name__ == '__main__':
 
         sync_and_install_sdk(proj, version)
 
+    # 链接 SDK
+    if action == 'link':
+
+        pass
+
     # publish version by jenkins
     elif action == 'publish':
         # publish sdk with special version
@@ -577,7 +635,7 @@ if __name__ == '__main__':
     # publish version directly from unity
     elif action == 'quick_publish':
         # publish sdk by unity project inside cmd
-        if is_str_empty(proj):
+        if is_empty_str(proj):
             print('empty source_path, make sure you were on the right path!')
             exit(ERROR_WRONG_SOURCE_PATH)
         else:
@@ -597,6 +655,7 @@ if __name__ == '__main__':
             branch = 'main'
         else:
             debug_repos(branch)
+
     # test function
     elif action == 'test':
         debug_test_func()

@@ -228,32 +228,30 @@ namespace Guru.SDK
             EditorGUILayout.LabelField(info.desc, s2);
             
             // 如果 当前版本不是安装版本
-            if (verName != _installedVersion)
+            // if (verName != _installedVersion)
+            // {
+            GUILayout.Space(4);
+            
+            var sdkHome = _controller.GetSDKVersionHome(verName);
+            if (Directory.Exists(sdkHome))
             {
-                
-                GUILayout.Space(4);
-                
-                var sdkHome = _controller.GetSDKVersionHome(verName);
-                if (Directory.Exists(sdkHome))
+                // 如果本地有缓存
+                GUIButton($"安装【{verName}】全部依赖", () =>
                 {
-                    // 如果本地有缓存
-                    GUIButton($"安装【{verName}】全部依赖", () =>
-                    {
-                        _controller.RunInstallSDK(verName);
-                    }, 40, Color.green);
+                    _controller.RunInstallSDK(verName);
+                }, 40, Color.green);
 
-                    DrawPackageMap(sdkHome);
-                }
-                else
-                {
-                    // 本地无缓存，需要在线拉取
-                    GUIButton($"下载并安装【{verName}】全部依赖", () =>
-                    {
-                        _controller.RunInstallSDK(verName);
-                    }, 40, Color.yellow);
-                }
-                
+                DrawPackageMap(sdkHome);
             }
+            else
+            {
+                // 本地无缓存，需要在线拉取
+                GUIButton($"下载并安装【{verName}】全部依赖", () =>
+                {
+                    _controller.RunInstallSDK(verName);
+                }, 40, Color.yellow);
+            }
+          
         }
 
 

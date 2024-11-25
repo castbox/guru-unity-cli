@@ -67,8 +67,8 @@ namespace Guru.SDK
     [Serializable]
     public class SDKVersionInfo
     {
-        public int ts;
-        public string desc;
+        public long ts; // 时间戳
+        public string desc; // 版本描述
     }
 
 
@@ -78,25 +78,24 @@ namespace Guru.SDK
     {
         private static readonly string CacheRoot = Path.GetFullPath($"{Application.dataPath}/ProjectSettings");
         private const string FileName = "guru-sdk-installer.json";
-
-
-        public string install_version;
-        public string install_date;
+        public string install_version; // 安装版本号
+        public long install_ts; // 安装版本的时间戳
 
         /// <summary>
         /// 是否已有安装版本
         /// </summary>
         /// <returns></returns>
-        public bool HasInstalled() => !string.IsNullOrEmpty(install_version) && !string.IsNullOrEmpty(install_date);
+        public bool HasInstalled() => !string.IsNullOrEmpty(install_version) && install_ts == 0;
 
         /// <summary>
         /// 设置安装版本
         /// </summary>
         /// <param name="version"></param>
-        public void SetInstallVersion(string version)
+        /// <param name="timestamp"></param>
+        public void SetInstallData(string version, long timestamp)
         {
             install_version = version;
-            install_date = DateTime.UtcNow.ToString("g");
+            install_ts = timestamp;
             Save();
         }
 
@@ -116,6 +115,11 @@ namespace Guru.SDK
         public void Save()
         {
             var json = JsonMapper.ToJson(this);
+            if (!Directory.Exists(CacheRoot))
+            {
+                Directory.CreateDirectory(CacheRoot);
+            }
+
             File.WriteAllText(Path.Combine(CacheRoot, FileName), json);
         }
 
