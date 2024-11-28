@@ -193,7 +193,11 @@ def sync_and_install_sdk(unity_proj: str, version: str):
     else:
         # check version should update
         local_version_list = json.loads(read_file(version_home))
-        if should_update_sdk(version, str(local_version_list['versions'][version]['ts'])):
+        need_update = True
+        if version in local_version_list['versions']:
+            need_update = should_update_sdk(version, str(local_version_list['versions'][version]['ts']))
+
+        if need_update:
             sync_sdk(False)
 
     install_sdk_to_project(unity_proj, version)
