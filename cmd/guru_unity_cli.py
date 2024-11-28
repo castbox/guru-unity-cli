@@ -1,6 +1,11 @@
 #! /usr/bin/python3
 # coding=utf-8
 
+"""
+GuruSDK CLI Tool
+A command line interface for managing GuruSDK installation and publishing
+"""
+
 import argparse
 import os
 import shutil
@@ -9,10 +14,12 @@ import datetime
 import requests
 from os.path import expanduser
 
-# CONSTS
+# Define constants
 VERSION = '0.4.9'
 # DESC = 'Fix bug: publish sdk with empty folders. bug: install sdk on windows get Error in batch'
 DESC = 'Fix bugs. update sate: 2024-11-20'
+
+# Define paths
 SDK_CONFIG_JSON = 'sdk-config.json'  # SDK 开发者定义的 upm 包的配置关系，包含所有包体的可选以及从属关系, [需要配置在 DEV 项目]
 SDK_HOME_PATH = '.guru/unity/guru-sdk'  # 用户设备上缓存 SDK 各个版本的路径
 SDK_TEMP_PATH = '.guru/unity/temp'  # 用户设备上临时缓存路径
@@ -172,11 +179,22 @@ def set_cmd_root(val: str):
 def sync_and_install_sdk(unity_proj: str, version: str):
     clear_log()
 
-    path = path_join(get_sdk_home(), VERSION_LIST)
-    local_version_list = json.loads(read_file(path))
+    version_home = path_join(get_sdk_home(), VERSION_LIST)
 
-    if should_update_sdk(version, str(local_version_list['versions'][version]['ts'])):
+    if not os.path.exists(version_home):
+        # version not exists
+        # 1st time try to sync latest lib repo
         sync_sdk(False)
+        # 2nd if version_home still not exists
+        if not os.path.exists(version_home):
+            print(f'Version not found {version}, check version_list first!')
+            log_failed(f'version not exists: {version}')
+            exit(ERROR_PATH_NOT_FOUND)
+    else:
+        # check version should update
+        local_version_list = json.loads(read_file(version_home))
+        if should_update_sdk(version, str(local_version_list['versions'][version]['ts'])):
+            sync_sdk(False)
 
     install_sdk_to_project(unity_proj, version)
     pass

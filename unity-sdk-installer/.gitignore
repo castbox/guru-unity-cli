@@ -88,3 +88,6 @@ Assets/StreamingAssets/build_info.meta
 Packages/.upm
 
 
+
+# Guru UPM
+Packages/.upm.*
