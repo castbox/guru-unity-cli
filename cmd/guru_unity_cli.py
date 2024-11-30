@@ -219,18 +219,18 @@ def should_update_sdk(version: str, ts: str):
     if is_empty_str(version) or is_empty_str(ts):
         return True
 
-    result = True
-
     # check online version list
     resp = requests.get(VERSION_LIST_URL)
     if resp.status_code == 200:
         doc = resp.json()
         for v in doc['versions']:
-            if v == version and str(doc['versions'][v]['ts']) == ts:
-                result = False
+            if v == version:
+                online_ts = str(doc['versions'][v]['ts'])
+                if online_ts == ts:
+                    print(f'Version [{version}] :: local:[{ts}] not match online:[{online_ts}], need to update sdk')
+                    return False
         pass
-
-    return result
+    return True
 
 
 # download latest sdk
