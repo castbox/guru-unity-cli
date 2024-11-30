@@ -15,7 +15,7 @@ import requests
 from os.path import expanduser
 
 # Define constants
-VERSION = '0.4.9'
+VERSION = '0.4.10'
 # DESC = 'Fix bug: publish sdk with empty folders. bug: install sdk on windows get Error in batch'
 DESC = 'Fix bugs. update sate: 2024-11-20'
 
@@ -40,7 +40,7 @@ ERROR_WRONG_SOURCE_PATH = 102
 ERROR_SDK_CONFIG_NOT_FOUND = 103
 ERROR_SDK_CONFIG_LOAD_ERROR = 104
 ERROR_PATH_NOT_FOUND = 405
-
+ERROR_WRONG_ARGS_FORMAT = 501
 
 # global cmd_root var
 _cmd_root_path = ''
@@ -277,7 +277,7 @@ def install_sdk_to_project(unity_proj_path: str, version: str):
                 print(f'package [{p}] not found, skip install...')
                 continue
 
-            print('Add package at path: ', in_path)
+            print(f'Add package at path: {in_path}')
             make_softlink(in_path, p, upm_root)
 
             # record deps
@@ -309,12 +309,24 @@ def clean_old_soft_links(upm_root: str):
 
 # create softlink with os cmd
 def make_softlink(source_path: str, link_name: str, dest_dir: str):
+    if is_empty_str(source_path):
+        print(f'wrong source_path: [{source_path}]')
+        exit(ERROR_WRONG_ARGS_FORMAT)
+
+    link_path = path_join(dest_dir, f'{UPM_PREFIX}{link_name}')
+
+    # delete old link
+    if os.path.exists(link_path):
+        os.remove(link_path)
+
     if is_windows_platform():
         # run_cmd(f'mklink /D {dest_dir}\\{link_name} {source_path}')
-        os.symlink(source_path, f'{dest_dir}/{UPM_PREFIX}{link_name}')
+        os.symlink(source_path, link_path)
         pass
     else:
-        run_cmd(f'ln -s {source_path} {UPM_PREFIX}{link_name}', dest_dir)
+        cmd = f'ln -s {source_path} {link_path}'
+        print(f'make softlink >> [{source_path}] -> [{link_path}]')
+        run_cmd(cmd)
         pass
     pass
 
