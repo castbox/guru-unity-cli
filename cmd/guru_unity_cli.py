@@ -174,7 +174,18 @@ def set_cmd_root(val: str):
     _cmd_root_path = val
 
 
-# ---------------------- SYNC ----------------------
+# ---------------------- Install ----------------------
+# install from unity project
+def install_by_unit_proj(unity_proj: str):
+    sdk_data = path_join(unity_proj, f'ProjectSettings/guru-sdk-installer.json')
+    if not os.path.exists(sdk_data):
+        exit(ERROR_PATH_NOT_FOUND)
+
+    doc = json.loads(read_file(sdk_data))
+    version = doc['install_version']
+    sync_and_install_sdk(unity_proj, version)
+
+
 # sync and install sdk from local cache
 def sync_and_install_sdk(unity_proj: str, version: str):
     clear_log()
@@ -628,7 +639,7 @@ def debug_test_func():
 # init all the args from input
 def init_args():
     parser = argparse.ArgumentParser(description='guru-sdk cli tool')
-    parser.add_argument('action', type=str,help='sync, install, publish, quick_publish, delete_version, debug_source, test')
+    parser.add_argument('action', type=str,help='sync, install, unity_install, publish, quick_publish, delete_version, debug_source, test')
     parser.add_argument('--version', type=str, help='version for publish')
     parser.add_argument('--branch', type=str, help='branch for pulling all library repo')
     parser.add_argument('--proj', type=str, help='unity project path')
@@ -677,6 +688,15 @@ if __name__ == '__main__':
             pass
 
         sync_and_install_sdk(proj, version)
+
+    # install from unity project
+    if action == 'unity_install':
+        if not os.path.exists(proj):
+            print(f'Can not found unity project at\n{proj}')
+            exit(ERROR_UNITY_PROJECT_NOT_FOUND)
+
+        install_by_unit_proj(proj)
+        pass
 
     # 链接 SDK
     if action == 'link':
