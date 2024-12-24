@@ -15,9 +15,9 @@ import requests
 from os.path import expanduser
 
 # Define constants
-VERSION = '0.4.10'
+VERSION = '0.5.0'
 # DESC = 'Fix bug: publish sdk with empty folders. bug: install sdk on windows get Error in batch'
-DESC = 'Fix bugs. update sate: 2024-11-20'
+DESC = 'Restructured the entire UPM Repos from scattered repos to one big repo. (v2) 2024-12-24'
 
 # Define paths
 SDK_CONFIG_JSON = 'sdk-config.json'  # SDK 开发者定义的 upm 包的配置关系，包含所有包体的可选以及从属关系, [需要配置在 DEV 项目]
@@ -25,6 +25,7 @@ SDK_HOME_PATH = '.guru/unity/guru-sdk'  # 用户设备上缓存 SDK 各个版本
 SDK_TEMP_PATH = '.guru/unity/temp'  # 用户设备上临时缓存路径
 SDK_LIB_REPO = 'git@github.com:castbox/unity-gurusdk-library.git'  # 线上发布的 SDK 静态库的 repo
 SDK_DEV_REPO = 'git@github.com:castbox/unity-gurusdk-dev.git'  # SDK 开发者所使用的开发 Repo
+SDK_LIB_V2 = 'com.guru.unity.sdk.v2'  # SDK upm 整体合并后的 lib 版本（V2）
 UPM_PREFIX = '.upm.'  # 在用户的项目中 Packages 的路径前缀
 UNITY_MANIFEST_JSON = 'manifest.json'  # unity 项目自身的 UPM 包清单文件
 UNITY_PACKAGES_LOCK_JSON = 'packages-lock.json'  # unity 项目自身的 UPM 包清单文件
@@ -43,7 +44,7 @@ ERROR_PATH_NOT_FOUND = 405
 ERROR_WRONG_ARGS_FORMAT = 501
 
 # global cmd_root var
-_cmd_root_path = ''
+CURRENT_PATH = os.getcwd()
 
 
 # ---------------------- UTILS ----------------------
@@ -135,13 +136,13 @@ def write_file(path: str, content: str):
 
 
 def clear_log():
-    path = f'{get_cmd_root()}/{LOG_TXT}'
+    path = f'{CURRENT_PATH}/{LOG_TXT}'
     if os.path.exists(path):
         os.remove(path)
 
 
 def save_log_txt(txt: str):
-    path = f'{get_cmd_root()}/{LOG_TXT}'
+    path = f'{CURRENT_PATH}/{LOG_TXT}'
     write_file(path, txt)
 
 
@@ -163,15 +164,6 @@ def log_failed(content: str):
 
 def get_timestamp():
     return int(datetime.datetime.utcnow().timestamp())
-
-
-def get_cmd_root():
-    return _cmd_root_path
-
-
-def set_cmd_root(val: str):
-    global _cmd_root_path
-    _cmd_root_path = val
 
 
 # ---------------------- Install ----------------------
@@ -409,9 +401,9 @@ def publish_and_push(source: str, output: str):
 # publish sdk vai cil or jenkins
 def publish_sdk_by_cli(publish_branch: str):
     # clean old dirs
-    td = path_join(get_cmd_root(), 'source')
+    td = path_join(CURRENT_PATH, 'source')
     delete_dir(td)
-    td = path_join(get_cmd_root(), 'output')
+    td = path_join(CURRENT_PATH, 'output')
     delete_dir(td)
     # download all repos
     source = download_source_repo(publish_branch)
@@ -435,11 +427,11 @@ def publish_from_unity_project(unity_project: str):
 
 # download unity-gurusdk-dev repo to dest path ( the default pull_branch is 'main' )
 def download_source_repo(pull_branch: str = ''):
-    dest = path_join(get_cmd_root(), 'source')
+    dest = path_join(CURRENT_PATH, 'source')
 
     # clear source from last pull
     if os.path.exists(dest):
-        print('clear source at', dest)
+        print('clear source path')
         delete_dir(dest)
 
     if len(pull_branch) == 0:
@@ -457,8 +449,8 @@ def download_source_repo(pull_branch: str = ''):
 # download unity-gurusdk-library repo to dest path ( the default pull_branch is 'main' )
 def download_output_repo(root: str = ''):
     if is_empty_str(root):
-        print('--- empty input root value, set to od')
-        root = get_cmd_root()
+        root = CURRENT_PATH
+        print(f'--- empty input root value, set to current dir: {root}')
 
     print('download_output_repo -> root:', root)
     dest = path_join(root, 'output')
@@ -466,8 +458,9 @@ def download_output_repo(root: str = ''):
 
     # clear temp lib dir
     if os.path.exists(dest):
-        print('clear output at', dest)
+        print('clear output path')
         delete_dir(dest)
+
 
     # clone lib
     print('create output at', dest)
@@ -493,7 +486,7 @@ def download_all_repos(dev_branch: str):
 # and collect them into ‘dev_project/packages’ path
 # all ump repos from GitHub will be cloned
 def build_version_packages_and_files(source: str, output: str):
-    submodules = path_join(source, 'packages')
+    packages = path_join(source, 'packages')
     unity_proj_path = path_join(source, UNITY_DEV_PROJECT)
     packages_path = path_join(unity_proj_path, UNITY_PACKAGES_ROOT)
     # package_cache = path_join(unity_proj_path, 'Library/PackageCache')
@@ -516,14 +509,14 @@ def build_version_packages_and_files(source: str, output: str):
         exit(ERROR_SDK_CONFIG_LOAD_ERROR)
 
     sdk_config['ts'] = f'{get_timestamp()}' # write ts on publish date
-    version = sdk_config['version']
+    sdk_version = sdk_config['version']
 
     # pull all submodules
     sc = f'git submodule update --init --recursive'
     run_cmd(sc, source)
 
     # clean and rebuild version folder
-    dest = path_join(output, version)
+    dest = path_join(output, sdk_version)
     if os.path.exists(dest):
         delete_dir(dest)
 
@@ -532,11 +525,27 @@ def build_version_packages_and_files(source: str, output: str):
     # copy submodules into version dir
     run_cmd(f"cp {config_file} {path_join(dest, SDK_CONFIG_JSON)}")
 
-    # 1. copy all submodules in packages to dest
-    for item in os.listdir(submodules):
-        dd = os.path.join(submodules, item)
-        if os.path.isdir(dd):
-            shutil.copytree(dd, path_join(dest, item))
+    # # 1. copy all submodules in packages to dest
+    # for item in os.listdir(submodules):
+    #     dd = os.path.join(submodules, item)
+    #     if os.path.isdir(dd):
+    #         shutil.copytree(dd, path_join(dest, item))
+
+    # 1.1 copy all sub folder in lib v2 to dest
+    lib_v2 = path_join(packages, SDK_LIB_V2)
+    if not os.path.exists(lib_v2):
+        print(f'path not found: {lib_v2} !')
+        exit(ERROR_PATH_NOT_FOUND)
+        pass
+
+    for item in os.listdir(lib_v2):
+        from_path = os.path.join(lib_v2, item)
+        if os.path.isdir(from_path):
+            if item.startswith('.'):
+                continue
+
+            to_path = path_join(dest, item)
+            shutil.copytree(from_path, to_path)
 
     # 2. clone all git upm from packages-lock.json to dest
     f = read_file(lock_file)
@@ -578,7 +587,7 @@ def build_version_packages_and_files(source: str, output: str):
             pass
         pass
 
-    return version, sdk_config
+    return sdk_version, sdk_config
     pass
 
 
@@ -618,7 +627,7 @@ def debug_repos(branch: str):
 
 
 def debug_test_func():
-    cp = get_cmd_root()
+    cp = CURRENT_PATH
     print('current path', cp)
 
     time_str = datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S")
@@ -648,19 +657,16 @@ def init_args():
     return parser.parse_args()
 
 
-# Entry of the cli.
-if __name__ == '__main__':
+# main function for cli enter point
+def main():
     print(f'========== Welcome to GuruSDK CLI [{VERSION}] ==========')
     print(f'UPDATE:{DESC}\n')
 
-    # set cmd root from cmd
-    set_cmd_root(os.getcwd())
-
     args = init_args()
-    print('OS', os.name)
+    print('OS:', os.name)
     print('Action:', args.action)
-    print('CMD_ROOT', get_cmd_root())
-    print('SDK_HOME', get_sdk_home())
+    print('CMD_ROOT:', CURRENT_PATH)
+    print('SDK_HOME:', get_sdk_home())
 
     action: str = args.action
     version: str = args.version
@@ -743,5 +749,9 @@ if __name__ == '__main__':
         pass
 
     # print('get ts', int(datetime.datetime.today().timestamp()))
-
     pass
+
+
+# Entry of the cli.
+if __name__ == '__main__':
+    main()
