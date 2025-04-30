@@ -15,7 +15,7 @@ import requests
 from os.path import expanduser
 
 # Define constants
-VERSION = '0.5.0'
+VERSION = '0.5.1'
 # DESC = 'Fix bug: publish sdk with empty folders. bug: install sdk on windows get Error in batch'
 DESC = 'Restructured the entire UPM Repos from scattered repos to one big repo. (v2) 2024-12-24'
 
@@ -34,6 +34,7 @@ UNITY_DEV_PROJECT = 'GuruSDKDev'  # unity 开发项目中 Unity 工程路径的�
 VERSION_LIST = 'version_list.json'  # SDK 版本描述文件
 VERSION_LIST_URL = 'https://raw.githubusercontent.com/castbox/unity-gurusdk-library/refs/heads/main/version_list.json'
 LOG_TXT = 'log.txt'
+GURU_SERVICES='Assets/Guru/Resources/guru_services.txt'
 
 ERROR_UNITY_PROJECT_NOT_FOUND = 100
 ERROR_WRONG_VERSION = 101
@@ -46,6 +47,18 @@ ERROR_WRONG_ARGS_FORMAT = 501
 # global cmd_root var
 CURRENT_PATH = os.getcwd()
 
+selectable_packages = {
+    "com.guru.unity.adjust" : True,
+    "com.guru.unity.appsflyer":False,
+    "com.thinkingdata.analytics":False
+}
+
+# 定义映射关系：app_settings 的 key 到 selectable_packages 的 key
+setting_to_package = {
+    "enable_adjust": "com.guru.unity.adjust",
+    "enable_appsflyer": "com.guru.unity.appsflyer",
+    "enable_thinkingdata": "com.thinkingdata.analytics",
+}
 
 # ---------------------- UTILS ----------------------
 # call cmd
@@ -247,9 +260,28 @@ def sync_sdk(show_log: bool = True):
         log_success('sync complete')
     pass
 
+def init_selectable_packages(unity_proj_path: str):
+    guru_services_path = path_join(unity_proj_path, GURU_SERVICES)
+    guru_services = json.loads(read_file(guru_services_path))
+    if guru_services is None:
+        return
+
+    if "app_settings" not in guru_services:
+        return
+
+    app_settings = guru_services["app_settings"];
+    if app_settings is None:
+        return
+    # 使用 for 循环遍历映射关系，动态设置 selectable_packages
+    for setting_key, package_key in setting_to_package.items():
+        if setting_key in app_settings:
+            selectable_packages[package_key] = app_settings[setting_key]
+    pass
 
 # sync latest sdk repo to the path '~/.guru/unity/guru-sdk'
 def install_sdk_to_project(unity_proj_path: str, version: str):
+    init_selectable_packages(unity_proj_path)
+
     sdk_home = get_sdk_home()
     version_home = path_join(sdk_home, version)
     upm_root = path_join(unity_proj_path, UNITY_PACKAGES_ROOT)
@@ -278,11 +310,20 @@ def install_sdk_to_project(unity_proj_path: str, version: str):
             print('json parse error with', sdk_config, 'plz fix the errors')
             return
 
+        # 先移除
+        for p in cfg['packages']:
+            if p in manifest_json['dependencies']:
+                del manifest_json['dependencies'][p]
+
         for p in cfg['packages']:
             in_path = path_join(version_home, p)
             if not os.path.exists(in_path):
                 print(f'package [{p}] not found, skip install...')
                 continue
+
+            if p in selectable_packages:
+                if selectable_packages[p] is False:
+                    continue
 
             print(f'Add package at path: {in_path}')
             make_softlink(in_path, p, upm_root)
