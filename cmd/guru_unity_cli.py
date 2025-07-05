@@ -358,18 +358,37 @@ def save_unity_manifest_json(path: str, data: object):
 def make_git_ignore(unity_project: str):
     file = path_join(unity_project, '.gitignore')
     comments = '# Guru UPM'
-    content = f'{comments}\nPackages/{UPM_PREFIX}*'
+    old_line = f'{comments}\nPackages/{UPM_PREFIX}*'
+    keep_manifest = '!Packages/manifest.json'
+    keep_package_lock = '!Packages/packages-lock.json'
+    keep_sdk_config = '!Packages/sdk-config.json'
+    ignore_line= 'Packages/*'
+    content = f'{comments}\n{keep_manifest}\n{keep_package_lock}\n{keep_sdk_config}\n{ignore_line}\n\n'
 
     if os.path.exists(file):
         txt = read_file(file)
-        if comments not in txt:
-            txt = txt + f'\n{content}'
-            write_file(file, txt)
-        pass
+
+        need_write = False
+        if comments in txt:
+            # 删除老的
+            if old_line in txt:
+                txt = txt.replace(old_line, '')
+                need_write = True
+        else:
+            need_write = True
+
+        if not need_write:
+            return
+
+        # 写入新的忽略
+        txt = txt + f'\n{content}'
+        write_file(file, txt)
+
     else:
         # add ignore line in
         write_file(file, content)
-    pass
+
+
 
 
 # ---------------------- PUBLISH ----------------------
@@ -437,7 +456,8 @@ def download_source_repo(pull_branch: str = ''):
     if len(pull_branch) == 0:
         pull_branch = 'main'
 
-    print('create source at', dest)
+    print(f'--- pull code form {SDK_DEV_REPO} with branch: {pull_branch}')
+    print(f'--- create source at {dest}')
     os.makedirs(dest)
     run_cmd(f'git clone -b {pull_branch} --depth=1 {SDK_DEV_REPO} .', dest)
     run_cmd(f'git submodule update --init --recursive', dest)
@@ -650,8 +670,8 @@ def init_args():
     parser = argparse.ArgumentParser(description='guru-sdk cli tool')
     parser.add_argument('action', type=str,help='sync, install, unity_install, publish, quick_publish, delete_version, debug_source, test')
     parser.add_argument('--version', type=str, help='version for publish')
-    parser.add_argument('--branch', type=str, help='branch for pulling all library repo')
-    parser.add_argument('--proj', type=str, help='unity project path')
+    parser.add_argument('-b','--branch', type=str, help='branch for pulling all library repo')
+    parser.add_argument('-p','--proj', type=str, help='unity project path')
     parser.add_argument('--pkgs', type=str, help='package list which will be installed')
 
     return parser.parse_args()
