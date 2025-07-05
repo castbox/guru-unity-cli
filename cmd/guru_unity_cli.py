@@ -601,6 +601,10 @@ def build_version_packages_and_files(source: str, output: str):
             sc = f'git checkout {git_hash}'
             run_cmd(sc, to_path)
 
+            # 添加 LFS 文件拉取逻辑
+            cmd = f'git lfs install && git lfs pull'
+            run_cmd(cmd)
+
             # delete .git folder in cloned folder
             _git = path_join(to_path, '.git')
             delete_dir(_git)
