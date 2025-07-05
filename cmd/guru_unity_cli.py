@@ -403,9 +403,11 @@ def publish_and_push(source: str, output: str):
     push_msg = f'Make version {_version} on  {datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S")}  by push'
 
     # commit to the publishing repo
+    run_cmd(f'git lfs install', output)
     run_cmd(f'git add .', output)
     run_cmd(f'git commit -m \"{push_msg}\"', output)
     run_cmd(f'git push', output)
+    run_cmd(f'git lfs push', output)
 
     print('===== Publish is done! ======')
 
