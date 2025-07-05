@@ -239,6 +239,10 @@ def sync_sdk(show_log: bool = True):
     print(f'Clone sdk into {sdk_home}')
     run_cmd(f'git clone --depth 1 {SDK_LIB_REPO} .', sdk_home)
 
+    # 添加 LFS 文件拉取逻辑
+    cmd = f'git lfs install && git lfs pull'
+    run_cmd(cmd, sdk_home)
+
     if show_log:
         log_success('sync complete')
     pass
@@ -603,7 +607,7 @@ def build_version_packages_and_files(source: str, output: str):
 
             # 添加 LFS 文件拉取逻辑
             cmd = f'git lfs install && git lfs pull'
-            run_cmd(cmd)
+            run_cmd(cmd, to_path)
 
             # delete .git folder in cloned folder
             _git = path_join(to_path, '.git')
