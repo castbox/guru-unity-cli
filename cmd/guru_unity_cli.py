@@ -60,6 +60,8 @@ setting_to_package = {
     "enable_thinkingdata": "com.thinkingdata.analytics",
 }
 
+removeList = ["com.google.firebase.app"]
+
 # ---------------------- UTILS ----------------------
 # call cmd
 def run_cmd(cmdline: str,
@@ -300,6 +302,8 @@ def install_sdk_to_project(unity_proj_path: str, version: str):
     if manifest_json is None:
         return
 
+    run_cmd(f'rm -rf {upm_root}/.upm.*')    
+
     # install all packages from sdk-config
     with open(sdk_config, 'r', encoding='utf-8') as f:
         txt = f.read()
@@ -314,6 +318,11 @@ def install_sdk_to_project(unity_proj_path: str, version: str):
         for p in cfg['packages']:
             if p in manifest_json['dependencies']:
                 del manifest_json['dependencies'][p]
+
+        for p in removeList:
+            if p in manifest_json['dependencies']:
+                del manifest_json['dependencies'][p]        
+
 
         for p in cfg['packages']:
             in_path = path_join(version_home, p)
