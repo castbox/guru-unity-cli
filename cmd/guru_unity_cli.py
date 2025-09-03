@@ -184,6 +184,14 @@ def setup_unity_marcos(add_macros: list, remove_macros: list, unity_proj_path: s
             # 从当前行向下读取 20 行
             for j in range(1, 20):
                 t_line = lines[i + j]
+
+                if 'additionalCompilerArguments' in t_line:
+                    break
+                if 'platformArchitecture' in t_line:
+                    break
+                if 'scriptingBackend' in t_line:
+                    break
+
                 if 'Android:' in t_line:
                     and_idx = i+j
                 elif 'iPhone:' in t_line:
