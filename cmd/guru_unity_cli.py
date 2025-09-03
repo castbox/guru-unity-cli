@@ -180,37 +180,39 @@ def setup_unity_marcos(add_macros: list, remove_macros: list, unity_proj_path: s
         line = lines[i]
         and_idx = -1
         ios_idx = -1
+        
         if 'scriptingDefineSymbols:' in line:
             # 从当前行向下读取 20 行
             for j in range(1, 20):
                 t_line = lines[i + j]
-
-                if 'additionalCompilerArguments' in t_line:
-                    break
-                if 'platformArchitecture' in t_line:
-                    break
-                if 'scriptingBackend' in t_line:
-                    break
-
                 if 'Android:' in t_line:
                     and_idx = i+j
                 elif 'iPhone:' in t_line:
                     ios_idx = i+j
 
-            if and_idx > 0 and ios_idx > 0:
-                break
+                if and_idx > 0 and ios_idx > 0:
+                    all_idx = [and_idx, ios_idx]
+                    break
 
-    all_idx = [and_idx, ios_idx]
+            if len(all_idx) > 0:
+                break        
+
     for idx in all_idx:
         raw = lines[idx].split(': ')
         marcos = raw[1].strip().split(';')
 
+        print(f'marcos: {marcos}')
+        print(f'remove_macros: {remove_macros}')
+        print(f'add_macros: {add_macros}')
+
         for r in remove_macros:
             if r in marcos:
+                print(f'remove {r} from {marcos}')
                 marcos.remove(r)
 
         for a in add_macros:
             if a not in marcos:
+                print(f'add {a} to {marcos}')
                 marcos.append(a)
 
         lines[idx] = f"{raw[0]}: {';'.join(marcos)}\n"
@@ -433,10 +435,12 @@ def install_sdk_to_project(unity_proj_path: str, version: str):
         for setting_key in setting_to_package:
             enable = setting_to_package[setting_key]["enable"]
             selectable_packages[setting_to_package[setting_key]["package_name"]] = enable
+            macro = setting_to_package[setting_key]["macro"]
             if enable is True:
-                add_macros.append(setting_to_package[setting_key]["macro"])
-            else:
-                removeList.append(setting_to_package[setting_key]["macro"])       
+                print(f'add {macro} to add_macros')
+                add_macros.append(macro)
+            else: 
+                remove_macros.append(macro)    
 
         for p in cfg['packages']:
             in_path = path_join(version_home, p)
