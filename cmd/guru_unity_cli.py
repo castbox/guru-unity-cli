@@ -547,9 +547,10 @@ def make_git_ignore(unity_project: str):
         if not need_write:
             return
 
-        # 写入新的忽略
-        txt = txt + f'\n{content}'
-        write_file(file, txt)
+        if content not in txt:
+            # 写入新的忽略
+            txt = txt + f'\n{content}'
+            write_file(file, txt)
 
     else:
         # add ignore line in
