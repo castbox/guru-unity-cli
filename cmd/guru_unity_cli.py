@@ -11,11 +11,25 @@ import os
 import shutil
 import json
 import datetime
-import requests
+import subprocess
 from os.path import expanduser
 
+# 确保导入库可用
+try:
+    import requests
+except ImportError:
+    print("Installing required dependencies...")
+    subprocess.check_call(
+        [
+            "pip3",
+            "install",
+            "requests",
+        ]
+    )
+    import requests
+
 # Define constants
-VERSION = '0.5.1'
+VERSION = '0.6.0'
 # DESC = 'Fix bug: publish sdk with empty folders. bug: install sdk on windows get Error in batch'
 DESC = 'Restructured the entire UPM Repos from scattered repos to one big repo. (v2) 2024-12-24'
 
@@ -47,20 +61,39 @@ ERROR_WRONG_ARGS_FORMAT = 501
 # global cmd_root var
 CURRENT_PATH = os.getcwd()
 
-selectable_packages = {
-    "com.guru.unity.adjust" : True,
-    "com.guru.unity.appsflyer":False,
-    "com.thinkingdata.analytics":False
-}
+# selectable_packages = {
+#     "com.guru.unity.adjust" : True,
+#     "com.guru.unity.appsflyer":False,
+#     "com.thinkingdata.analytics":False
+# }
+
+# # 定义映射关系：app_settings 的 key 到 selectable_packages 的 key
+# setting_to_package = {
+#     "enable_adjust": "com.guru.unity.adjust",
+#     "enable_appsflyer": "com.guru.unity.appsflyer",
+#     "enable_thinkingdata": "com.thinkingdata.analytics",
+# }
 
 # 定义映射关系：app_settings 的 key 到 selectable_packages 的 key
 setting_to_package = {
-    "enable_adjust": "com.guru.unity.adjust",
-    "enable_appsflyer": "com.guru.unity.appsflyer",
-    "enable_thinkingdata": "com.thinkingdata.analytics",
+    "enable_adjust": {
+        "package_name": "com.guru.unity.adjust",
+        "enable": True,
+        "macro": "GURU_ADJUST"
+    },
+    "enable_appsflyer":  {
+        "package_name": "com.guru.unity.adjust",
+        "enable": False,
+        "macro": "GURU_APPSFLYER"
+    },
+    "enable_thinkingdata": {
+        "package_name": "com.guru.unity.adjust",
+        "enable": False,
+        "macro": "GURU_THINKINGDATA"
+    },
 }
 
-removeList = ["com.google.firebase.app"]
+removeList = ["com.google.firebase.app", "com.coffee.git-dependency-resolver", "com.coffee.upm-git-extension"]
 
 # ---------------------- UTILS ----------------------
 # call cmd
@@ -130,6 +163,66 @@ def to_safe_path(path: str):
         return path.replace('/', '\\')  # windows os
     return path.replace('\\', '/')  # mac or liunx os
 
+# 设置 Unity 的宏
+def setup_unity_marcos(add_macros: list, remove_macros: list, unity_proj_path: str):
+    print(f'开始处理 Unity Macro: {unity_proj_path}')
+
+    proj_settings_path = os.path.join(unity_proj_path, "ProjectSettings/ProjectSettings.asset")
+
+    lines = read_all_lines(proj_settings_path)
+
+    for i in range(len(lines)):
+        line = lines[i]
+        and_idx = -1
+        ios_idx = -1
+        if 'scriptingDefineSymbols:' in line:
+            # 从当前行向下读取 20 行
+            for j in range(1, 20):
+                t_line = lines[i + j]
+
+                if 'additionalCompilerArguments' in t_line:
+                    break
+                if 'platformArchitecture' in t_line:
+                    break
+                if 'scriptingBackend' in t_line:
+                    break
+
+                if 'Android:' in t_line:
+                    and_idx = i+j
+                elif 'iPhone:' in t_line:
+                    ios_idx = i+j
+
+            if and_idx > 0 and ios_idx > 0:
+                break
+
+    all_idx = [and_idx, ios_idx]
+    for idx in all_idx:
+        raw = lines[idx].split(': ')
+        marcos = raw[1].strip().split(';')
+
+        for r in remove_macros:
+            if r in marcos:
+                marcos.remove(r)
+
+        for a in add_macros:
+            if a not in marcos:
+                marcos.append(a)
+
+        lines[idx] = f"{raw[0]}: {';'.join(marcos)}\n"
+
+    write_all_lines(lines, proj_settings_path)
+
+def write_all_lines(lines: list, path: str):
+    with open(path, 'w', encoding='utf-8') as f:
+        f.writelines(lines)
+        f.close()
+
+# 读取所有行
+def read_all_lines(path: str):
+    with open(path, 'r', encoding='utf-8') as f:
+        lines = f.readlines()
+        f.close()
+        return lines
 
 # read content from a file
 def read_file(path: str):
@@ -271,14 +364,20 @@ def init_selectable_packages(unity_proj_path: str):
     if "app_settings" not in guru_services:
         return
 
-    app_settings = guru_services["app_settings"];
+    app_settings = guru_services["app_settings"]
     if app_settings is None:
         return
     # 使用 for 循环遍历映射关系，动态设置 selectable_packages
-    for setting_key, package_key in setting_to_package.items():
-        if setting_key in app_settings:
-            selectable_packages[package_key] = app_settings[setting_key]
+    for setting_name in setting_to_package:
+
+        has_key = app_settings.get(setting_name, None)
+        if has_key is None:
+            continue
+
+        setting_to_package[setting_name]["enable"] = app_settings[setting_name]
+    
     pass
+
 
 # sync latest sdk repo to the path '~/.guru/unity/guru-sdk'
 def install_sdk_to_project(unity_proj_path: str, version: str):
@@ -300,9 +399,11 @@ def install_sdk_to_project(unity_proj_path: str, version: str):
 
     manifest_json = load_unity_manifest_json(manifest_path)
     if manifest_json is None:
-        return
+        return 
 
-    run_cmd(f'rm -rf {upm_root}/.upm.*')    
+    add_macros = list()
+    remove_macros = list()
+    selectable_packages = {}
 
     # install all packages from sdk-config
     with open(sdk_config, 'r', encoding='utf-8') as f:
@@ -323,6 +424,14 @@ def install_sdk_to_project(unity_proj_path: str, version: str):
             if p in manifest_json['dependencies']:
                 del manifest_json['dependencies'][p]        
 
+        # 使用 for 循环遍历映射关系，动态设置 selectable_packages
+        for setting_key in setting_to_package:
+            enable = setting_to_package[setting_key]["enable"]
+            selectable_packages[setting_to_package[setting_key]["package_name"]] = enable
+            if enable is True:
+                add_macros.append(setting_to_package[setting_key]["macro"])
+            else:
+                removeList.append(setting_to_package[setting_key]["macro"])       
 
         for p in cfg['packages']:
             in_path = path_join(version_home, p)
@@ -334,17 +443,21 @@ def install_sdk_to_project(unity_proj_path: str, version: str):
                 if selectable_packages[p] is False:
                     continue
 
+            # 添加软连接
             print(f'Add package at path: {in_path}')
             make_softlink(in_path, p, upm_root)
 
             # record deps
-            manifest_json['dependencies'][p] = f'file:{UPM_PREFIX}{p}'
+            # 已经不再使用此方式引入 UPM
+            # manifest_json['dependencies'][p] = f'file:{UPM_PREFIX}{p}'
             pass
         # save the manifest file
         save_unity_manifest_json(manifest_path, manifest_json)
         pass
     pass
 
+    # 配置相关的宏
+    setup_unity_marcos(add_macros, remove_macros, unity_proj_path)
     # add .gitignore file
     make_git_ignore(unity_proj_path)
 
