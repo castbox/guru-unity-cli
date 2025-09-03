@@ -82,12 +82,12 @@ setting_to_package = {
         "macro": "GURU_ADJUST"
     },
     "enable_appsflyer":  {
-        "package_name": "com.guru.unity.adjust",
+        "package_name": "com.guru.unity.appsflyer",
         "enable": False,
         "macro": "GURU_APPSFLYER"
     },
     "enable_thinkingdata": {
-        "package_name": "com.guru.unity.adjust",
+        "package_name": "com.thinkingdata.analytics",
         "enable": False,
         "macro": "GURU_THINKINGDATA"
     },
@@ -112,12 +112,17 @@ def run_cmd(cmdline: str,
 # delete full dir
 def delete_dir(dir_path: str):
     if os.path.exists(dir_path):
+        print(f'delete dir: {dir_path}')
         if is_windows_platform():
             run_cmd(f'rd /s /q {dir_path}')
         else:
-            shutil.rmtree(dir_path)
+            run_cmd(f'rm -rf {dir_path}')
     else:
         print('dir is not exist:', dir_path)
+        if is_windows_platform():
+            run_cmd(f'rd /s /q {dir_path}')
+        else:
+            run_cmd(f'rm -rf {dir_path}')
     pass
 
 
@@ -469,7 +474,7 @@ def clean_old_soft_links(upm_root: str):
         print(f'Path not found: {upm_root}')
         exit(ERROR_PATH_NOT_FOUND)
 
-    dirs = os.listdir()
+    dirs = os.listdir(upm_root)
     for d in dirs:
         if d.startswith(UPM_PREFIX):
             # clean the old softlink
