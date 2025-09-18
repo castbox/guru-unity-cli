@@ -78,12 +78,12 @@ CURRENT_PATH = os.getcwd()
 setting_to_package = {
     "enable_adjust": {
         "package_name": "com.guru.unity.adjust",
-        "enable": True,
+        "enable": False,
         "macro": "GURU_ADJUST"
     },
     "enable_appsflyer":  {
         "package_name": "com.guru.unity.appsflyer",
-        "enable": False,
+        "enable": True,
         "macro": "GURU_APPSFLYER"
     },
     "enable_thinkingdata": {
@@ -364,6 +364,9 @@ def sync_sdk(show_log: bool = True):
 
 def init_selectable_packages(unity_proj_path: str):
     guru_services_path = path_join(unity_proj_path, GURU_SERVICES)
+    if os.path.exists(guru_services_path) is False:
+        return
+        
     guru_services = json.loads(read_file(guru_services_path))
     if guru_services is None:
         return
