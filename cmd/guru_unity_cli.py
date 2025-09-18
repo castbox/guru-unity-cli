@@ -237,7 +237,7 @@ def read_file(path: str):
         print('file not found', path)
         return ''
 
-    with open(path, 'r') as f:
+    with open(path, 'r', encoding='utf-8') as f:
         txt = f.read()
         f.close()
         return txt
